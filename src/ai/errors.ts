@@ -54,13 +54,22 @@ function extractMessage(json: unknown): string {
   return parts.join(" — ");
 }
 
+function describeRaw(raw: string): string {
+  const text = raw.trim();
+  if (!text.startsWith("<")) return text;
+  const title = /<title[^>]*>([^<]*)<\/title>/i.exec(text)?.[1]?.trim();
+  return `an HTML page${title ? ` titled "${title}"` : ""} instead of an API response`;
+}
+
 export function httpError(status: number, json: unknown, raw: string, label: string): AiError {
-  const detail = (extractMessage(json) || raw).trim().slice(0, 600);
+  const detail = (extractMessage(json) || describeRaw(raw)).slice(0, 600);
   const d = detail.toLowerCase();
   const err = (kind: AiErrorKind, message: string) => new AiError(kind, message, `HTTP ${status}${detail ? `: ${detail}` : ""}`);
 
   if (/location is not supported|unsupported_country|unsupported country|not available in your (country|region)/.test(d))
     return err("region", `${label} is not available from your location. Connect through a VPN, or use another provider.`);
+  if (status === 451 || (status === 403 && /html page|access denied|security policy|forbidden|blocked/.test(d)))
+    return err("region", `${label} blocked the request from your network (HTTP ${status}). Your country or IP address is probably blocked: connect through a VPN that covers Obsidian (system-wide or TUN mode), or try another VPN server.`);
   if (/data policy|privacy settings/.test(d))
     return err("policy", `${label}: no endpoint for this model matches your account's privacy settings. On OpenRouter, allow free-model data use at openrouter.ai/settings/privacy, or pick another model.`);
   if (status === 401 || /api key not valid|api_key_invalid|invalid api key|incorrect api key|invalid x-api-key|no auth credentials/.test(d))
