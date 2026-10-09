@@ -13,6 +13,7 @@ export type AiErrorKind =
   | "timeout"
   | "blocked"
   | "empty"
+  | "aborted"
   | "request";
 
 export class AiError extends Error {
@@ -87,6 +88,8 @@ export function httpError(status: number, json: unknown, raw: string, label: str
     return err("model", `${label}: this model was not found or is not available. Check its name with "Browse models" in settings.`);
   if (status === 403)
     return err("auth", `${label} refused the request. The key may not have access to this model.`);
+  if (status === 400 && /reasoning|thinking/.test(d))
+    return err("request", `${label} does not accept this action's Thinking setting. Set Thinking to "Model default" for this action, or pick another model.`);
   if (status >= 500)
     return err("server", `${label} is having trouble (HTTP ${status}). Try again shortly, or use another model.`);
   return err("request", `${label} rejected the request (HTTP ${status}).`);

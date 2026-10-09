@@ -1,4 +1,4 @@
-import { Editor, MarkdownFileInfo, MarkdownView, Notice, Plugin } from "obsidian";
+import { Editor, MarkdownFileInfo, MarkdownView, Notice, Plugin, TFile } from "obsidian";
 import { AiActionsSettings, DEFAULT_ACTIONS, DEFAULT_SETTINGS } from "./types";
 import { AiActionsSettingTab } from "./settings";
 import { KeyStore } from "./secrets/KeyStore";
@@ -8,6 +8,7 @@ import { AiError } from "./ai/errors";
 import { ActionPanel, PanelOptions } from "./ui/ActionPanel";
 import { ActionPicker } from "./ui/pickers";
 import { ResultModal } from "./ui/ResultModal";
+import { SaveOptions, saveAsNote } from "./notes/saveNote";
 
 export interface AiActionsApi {
   version: number;
@@ -19,6 +20,7 @@ export interface AiActionsApi {
   ready(): boolean;
   panel(el: HTMLElement, opts: PanelOptions): ActionPanel;
   pick(text: string, opts?: RunOptions): void;
+  saveNote(text: string, opts?: SaveOptions): Promise<TFile>;
   openSettings(): void;
 }
 
@@ -37,7 +39,7 @@ export default class AiActionsPlugin extends Plugin {
     this.client = new AiClient(this);
 
     this.api = {
-      version: 1,
+      version: 2,
       run: async (id, text, opts) => (await this.runById(id, text, opts)).text,
       runDetailed: (id, text, opts) => this.runById(id, text, opts),
       chat: (req) => this.client.chat(req),
@@ -46,6 +48,7 @@ export default class AiActionsPlugin extends Plugin {
       ready: () => this.client.candidates().length > 0,
       panel: (el, opts) => new ActionPanel(this, el, opts),
       pick: (text, opts) => this.pick(text, opts),
+      saveNote: (text, opts) => saveAsNote(this, text, opts),
       openSettings: () => this.openSettings(),
     };
 
@@ -74,6 +77,7 @@ export default class AiActionsPlugin extends Plugin {
     const stored = ((await this.loadData()) ?? {}) as Partial<AiActionsSettings>;
     this.settings = Object.assign({}, DEFAULT_SETTINGS, stored);
     if (!Array.isArray(stored.actions)) this.settings.actions = JSON.parse(JSON.stringify(DEFAULT_ACTIONS));
+    for (const a of this.settings.actions) a.thinking = a.thinking ?? "";
     this.settings.panels = { ...(stored.panels ?? {}) };
   }
 

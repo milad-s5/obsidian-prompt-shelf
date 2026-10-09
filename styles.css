@@ -120,3 +120,9 @@ details.aia-box > summary {
   color: var(--text-accent);
   font-size: var(--font-ui-smaller);
 }
+.aia-result-actions {
+  margin-top: var(--size-4-2);
+}
+.aia-streaming {
+  opacity: 0.92;
+}

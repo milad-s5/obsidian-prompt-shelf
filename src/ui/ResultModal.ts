@@ -1,8 +1,9 @@
 import { Editor, Modal, Notice } from "obsidian";
 import type AiActionsPlugin from "../main";
 import { RunOptions, RunResult, runAction } from "../ai/runAction";
+import { saveAsNote } from "../notes/saveNote";
 import { Action } from "../types";
-import { copyText, renderError, renderResult } from "./render";
+import { StreamView, copyText, renderError, renderResult } from "./render";
 
 export interface ResultModalOptions extends RunOptions {
   editor?: Editor;
@@ -13,6 +14,7 @@ export class ResultModal extends Modal {
   private status: HTMLElement;
   private output: HTMLElement;
   private buttons: HTMLElement;
+  private controller: AbortController | null = null;
 
   constructor(private plugin: AiActionsPlugin, private action: Action, private text: string, private opts: ResultModalOptions = {}) {
     super(plugin.app);
@@ -28,40 +30,58 @@ export class ResultModal extends Modal {
   }
 
   onClose(): void {
+    this.controller?.abort();
     this.contentEl.empty();
   }
 
   private async run(): Promise<void> {
-    this.buttons.empty();
     this.output.empty();
+    this.buttons.empty();
+    const controller = new AbortController();
+    this.controller = controller;
+    this.buttons.createEl("button", { text: "Stop", cls: "mod-warning" }).onclick = () => controller.abort();
+
+    const view = new StreamView(this.app, this.plugin, this.output);
     let result: RunResult | null = null;
     try {
       result = await runAction(this.plugin, this.action, this.text, {
         ...this.opts,
+        signal: controller.signal,
         onProgress: (s) => this.status.setText(s),
+        onPartial: (t) => view.update(t),
       });
+      view.stop();
       this.status.setText("");
       await renderResult(this.app, this.plugin, this.output, result);
     } catch (e) {
+      view.stop();
       this.status.setText("");
       renderError(this.output, e);
+    } finally {
+      this.controller = null;
     }
     this.renderButtons(result);
   }
 
   private renderButtons(result: RunResult | null): void {
-    const add = (text: string, onClick: () => void, cta = false) => {
+    this.buttons.empty();
+    const add = (text: string, onClick: () => unknown, cta = false) => {
       const b = this.buttons.createEl("button", { text });
       if (cta) b.addClass("mod-cta");
       b.onclick = onClick;
     };
     const { editor, hasSelection } = this.opts;
     if (result) {
-      const text = result.text;
-      add("Copy", () => void copyText(text).then(() => new Notice("Copied")), true);
+      const r = result;
+      add("Copy", () => void copyText(r.text).then(() => new Notice("Copied")), true);
+      add("Save as note", async () => {
+        const file = await saveAsNote(this.plugin, r.text, { action: this.action.name, models: r.models, vars: this.opts.vars });
+        new Notice(`Saved to ${file.path}`);
+        this.close();
+      });
       if (editor && hasSelection) {
         add("Replace selection", () => {
-          editor.replaceSelection(text);
+          editor.replaceSelection(r.text);
           this.close();
         });
       }
@@ -69,7 +89,7 @@ export class ResultModal extends Modal {
         add(hasSelection ? "Insert below selection" : "Insert at end", () => {
           const last = editor.lastLine();
           const pos = hasSelection ? editor.getCursor("to") : { line: last, ch: editor.getLine(last).length };
-          editor.replaceRange(`\n\n${text}\n`, pos);
+          editor.replaceRange(`\n\n${r.text}\n`, pos);
           this.close();
         });
       }

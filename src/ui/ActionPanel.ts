@@ -1,8 +1,14 @@
 import { Notice } from "obsidian";
 import type AiActionsPlugin from "../main";
 import { RunResult, Vars, runAction } from "../ai/runAction";
+import { saveAsNote } from "../notes/saveNote";
 import { Action } from "../types";
-import { copyText, renderError, renderResult } from "./render";
+import { StreamView, copyText, renderError, renderResult } from "./render";
+
+export interface PanelButton {
+  text: string;
+  onClick: (text: string, action: Action) => unknown;
+}
 
 export interface PanelOptions {
   /** Remembers the chosen action and model per panel */
@@ -14,6 +20,8 @@ export interface PanelOptions {
   vars?: Vars | (() => Vars);
   defaultAction?: string;
   actions?: string[];
+  /** Extra buttons shown next to Copy, enabled once there is an answer */
+  buttons?: PanelButton[];
   onResult?: (text: string, action: Action) => void;
 }
 
@@ -22,13 +30,13 @@ export class ActionPanel {
   private actionSelect: HTMLSelectElement;
   private modelSelect: HTMLSelectElement;
   private runButton: HTMLButtonElement;
-  private copyButton: HTMLButtonElement;
+  private resultButtons: HTMLButtonElement[] = [];
   private status: HTMLElement;
   private output: HTMLElement;
   private id: string;
   private actionId: string;
   private model: string;
-  private running: string | null = null;
+  private running: { key: string; controller: AbortController } | null = null;
   private shown: string | null = null;
   private failures = new Map<string, unknown>();
 
@@ -54,17 +62,52 @@ export class ActionPanel {
       this.remember();
       this.refresh();
     };
-    this.runButton = row.createEl("button", { cls: "mod-cta", text: "Run" });
-    this.runButton.onclick = () => void this.run();
-    this.copyButton = row.createEl("button", { text: "Copy" });
-    this.copyButton.onclick = () => void this.copy();
-    const gear = row.createEl("button", { text: "Settings" });
-    gear.onclick = () => plugin.openSettings();
+    this.runButton = row.createEl("button", { cls: "mod-cta" });
+    this.runButton.onclick = () => (this.running ? this.running.controller.abort() : void this.run());
+    row.createEl("button", { text: "Settings" }).onclick = () => plugin.openSettings();
+
+    const actions = el.createDiv({ cls: "aia-row aia-result-actions" });
+    const addResultButton = (text: string, onClick: (text: string, action: Action) => unknown) => {
+      const b = actions.createEl("button", { text });
+      b.onclick = async () => {
+        const result = this.result();
+        const action = this.action;
+        if (!result || !action) return;
+        try {
+          await onClick(result, action);
+        } catch (e) {
+          console.error("[ai-actions]", e);
+          new Notice(e instanceof Error ? e.message : String(e), 8000);
+        }
+      };
+      this.resultButtons.push(b);
+    };
+    addResultButton("Copy", async (text) => {
+      await copyText(text);
+      new Notice(`Copied ${text.length} characters`);
+    });
+    addResultButton("Save as note", async (text, action) => {
+      const key = this.resultKey();
+      const file = await saveAsNote(plugin, text, {
+        action: action.name,
+        models: key ? plugin.results.get(key)?.models : undefined,
+        vars: this.opts.vars,
+      });
+      new Notice(`Saved to ${file.path}`);
+    });
+    for (const b of opts.buttons ?? []) addResultButton(b.text, b.onClick);
+
     this.status = el.createDiv({ cls: "aia-muted aia-status" });
     this.output = el.createDiv({ cls: "aia-output" });
 
     plugin.panels.add(this);
     this.refresh();
+  }
+
+  /** The answer currently shown, if any */
+  result(): string | null {
+    const key = this.resultKey();
+    return (key && this.plugin.results.get(key)?.text) || null;
   }
 
   private get actions(): Action[] {
@@ -101,21 +144,25 @@ export class ActionPanel {
     this.modelSelect.value = this.model;
 
     const key = this.resultKey();
-    const busy = key !== null && this.running === key;
+    const busy = key !== null && this.running?.key === key;
     const ready = this.plugin.client.candidates(this.model || action?.model).length > 0;
     const hasText = key !== null && Boolean(this.opts.getText().trim());
     const result = key ? this.plugin.results.get(key) : undefined;
     const failure = key ? this.failures.get(key) : undefined;
 
-    this.runButton.disabled = busy || this.running !== null || !ready || !hasText || !action;
-    this.runButton.setText(result ? "Run again" : "Run");
-    this.copyButton.disabled = !result;
+    this.actionSelect.disabled = this.modelSelect.disabled = this.running !== null;
+    this.runButton.setText(busy ? "Stop" : result ? "Run again" : "Run");
+    this.runButton.toggleClass("mod-warning", busy);
+    this.runButton.toggleClass("mod-cta", !busy);
+    this.runButton.disabled = !busy && (this.running !== null || !ready || !hasText || !action);
+    for (const b of this.resultButtons) b.disabled = !result || busy;
     if (!busy) {
       this.status.setText(!ready ? "No model is set up yet — open Settings to add a provider and key."
         : !hasText ? "No text to send yet." : this.running ? "Another run is in progress…" : "");
     }
 
-    const shown = busy ? "busy" : result ? `ok:${key}` : failure ? `err:${key}` : "";
+    if (busy) return;
+    const shown = result ? `ok:${key}` : failure ? `err:${key}` : "";
     if (shown === this.shown) return;
     this.shown = shown;
     this.output.empty();
@@ -128,37 +175,44 @@ export class ActionPanel {
     const action = this.action;
     const key = this.resultKey();
     if (!action || key === null || this.running) return;
-    this.running = key;
+    const controller = new AbortController();
+    this.running = { key, controller };
     this.failures.delete(key);
+    this.shown = null;
+    this.output.empty();
+    this.output.removeClass("aia-hidden");
     this.refresh();
+
+    const view = new StreamView(this.plugin.app, this.plugin, this.output);
+    const visible = () => this.resultKey() === key;
     const started = Date.now();
     try {
       const result: RunResult = await runAction(this.plugin, action, this.opts.getText(), {
         vars: this.opts.vars,
         model: this.model,
+        signal: controller.signal,
         onProgress: (s) => {
-          if (this.resultKey() === key) this.status.setText(s);
+          if (visible()) this.status.setText(s);
+        },
+        onPartial: (t) => {
+          if (visible()) view.update(t);
         },
       });
       this.plugin.results.set(key, result);
       new Notice(`${action.name} finished in ${Math.round((Date.now() - started) / 1000)} s`);
       this.opts.onResult?.(result.text, action);
     } catch (e) {
-      console.error("[ai-actions]", e);
+      if (!controller.signal.aborted) {
+        console.error("[ai-actions]", e);
+        new Notice(`${action.name} failed: ${e instanceof Error ? e.message : String(e)}`, 10000);
+      }
       this.failures.set(key, e);
-      new Notice(`${action.name} failed: ${e instanceof Error ? e.message : String(e)}`, 10000);
     } finally {
+      view.stop();
       this.running = null;
       this.status.setText("");
+      this.shown = null;
       this.refresh();
     }
-  }
-
-  private async copy(): Promise<void> {
-    const key = this.resultKey();
-    const result = key ? this.plugin.results.get(key) : undefined;
-    if (!result) return;
-    await copyText(result.text);
-    new Notice(`Copied ${result.text.length} characters`);
   }
 }

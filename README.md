@@ -16,7 +16,9 @@ Each provider has a **Browse models** button that lists what the service offers 
 
 ## Using it
 
-**Command palette** — *AI Actions: Run an action on the selection or the whole note*. Pick an action; the answer opens in a window where you can copy it, replace the selection or insert it below.
+**Command palette** — *AI Actions: Run an action on the selection or the whole note*. Pick an action; the answer streams into a window where you can copy it, save it as a note, replace the selection or insert it below.
+
+Answers appear while they are being written, and a **Stop** button ends a run early. Providers that do not allow streaming from Obsidian fall back to waiting for the whole answer.
 
 **From a script** — the plugin exposes an API:
 
@@ -30,7 +32,9 @@ const panel = ai.panel(dv.el("div", ""), {
   getKey: () => currentItemId,    // answers are cached per key for the session
   vars: () => ({ title: myTitle }),
   defaultAction: "summarize",
+  buttons: [{ text: "Add to note", onClick: (answer, action) => { /* … */ } }],
 });
+panel.result();                   // the answer currently shown, or null
 panel.refresh();                  // call after the text changes
 
 // Without UI
@@ -38,7 +42,15 @@ const summary = await ai.run("summarize", text, { vars: { title } });
 const reply = await ai.chat({ system: "…", prompt: "…" });
 ```
 
-`ai.actions()`, `ai.models()`, `ai.ready()`, `ai.pick(text)` and `ai.openSettings()` are also available.
+`ai.saveNote(text, { action, vars })`, `ai.actions()`, `ai.models()`, `ai.ready()`, `ai.pick(text)` and `ai.openSettings()` are also available.
+
+## Saving answers
+
+**Save as note** creates a note in the folder set in settings (`Inbox` by default), named from a template such as `{{title}} - {{action}}`. The action, model, date and the script's variables — a title or a URL, say — become note properties.
+
+## Thinking
+
+Each action has a **Thinking** level: model default, off, low, medium or high. Lower is faster, and a summary rarely needs more than low. It maps to `reasoning_effort` (OpenAI), `reasoning.effort` (OpenRouter), a thinking budget (Anthropic, Gemini 2.x) or `thinkingLevel` (later Gemini models). A model that does not accept the setting says so, and the error tells you to switch it back.
 
 ## Prompts
 

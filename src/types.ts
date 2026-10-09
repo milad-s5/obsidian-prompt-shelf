@@ -1,5 +1,7 @@
 export type ProviderType = "openai" | "anthropic" | "gemini";
 
+export type ThinkingLevel = "" | "off" | "low" | "medium" | "high";
+
 export interface Provider {
   id: string;
   name: string;
@@ -12,6 +14,7 @@ export interface Action {
   id: string;
   name: string;
   model: string;
+  thinking: ThinkingLevel;
   system: string;
   prompt: string;
   mergePrompt: string;
@@ -31,6 +34,11 @@ export interface AiActionsSettings {
   chunkChars: number;
   maxTokens: number;
   timeoutSec: number;
+  streaming: boolean;
+  saveFolder: string;
+  saveName: string;
+  saveFrontmatter: boolean;
+  openAfterSave: boolean;
   panels: Record<string, PanelState>;
 }
 
@@ -45,6 +53,14 @@ export const PROVIDER_TYPES: Record<ProviderType, string> = {
   openai: "OpenAI-compatible",
   anthropic: "Anthropic",
   gemini: "Google Gemini",
+};
+
+export const THINKING_LEVELS: Record<ThinkingLevel, string> = {
+  "": "Model default",
+  off: "Off",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
 };
 
 export const PRESETS: ProviderPreset[] = [
@@ -63,6 +79,7 @@ export const DEFAULT_ACTIONS: Action[] = [
     id: "summarize",
     name: "Summarize",
     model: "",
+    thinking: "",
     system: "You summarize texts accurately and write in natural, fluent {{language}}. Use only what the text says.",
     prompt:
       "Summarize the text below in {{language}}. It may be an auto-generated video transcript, so punctuation can be missing and some words misheard.\n" +
@@ -79,6 +96,7 @@ export const DEFAULT_ACTIONS: Action[] = [
     id: "translate",
     name: "Translate",
     model: "",
+    thinking: "",
     system: "You are a professional translator into {{language}}.",
     prompt:
       "Translate the text below into natural {{language}}. If it lacks punctuation, add punctuation and paragraphs. Reply with the translation only.\n\n{{text}}",
@@ -88,6 +106,7 @@ export const DEFAULT_ACTIONS: Action[] = [
     id: "clean-transcript",
     name: "Clean up transcript",
     model: "",
+    thinking: "",
     system: "",
     prompt:
       "The text below is an auto-generated video transcript. Without summarizing and without changing its language, add punctuation and paragraphs, fix obvious mishearings, and add short headings for sections. Reply with the final text only.\n\n{{text}}",
@@ -104,5 +123,10 @@ export const DEFAULT_SETTINGS: AiActionsSettings = {
   chunkChars: 40000,
   maxTokens: 16000,
   timeoutSec: 180,
+  streaming: true,
+  saveFolder: "Inbox",
+  saveName: "{{title}} - {{action}}",
+  saveFrontmatter: true,
+  openAfterSave: true,
   panels: {},
 };

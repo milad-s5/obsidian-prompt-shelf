@@ -2,7 +2,7 @@ import { App, Notice, PluginSettingTab, Setting, TextComponent } from "obsidian"
 import type AiActionsPlugin from "./main";
 import { AiError } from "./ai/errors";
 import { ModelPicker } from "./ui/pickers";
-import { Action, DEFAULT_ACTIONS, PRESETS, PROVIDER_TYPES, Provider, ProviderType } from "./types";
+import { Action, DEFAULT_ACTIONS, PRESETS, PROVIDER_TYPES, Provider, ProviderType, THINKING_LEVELS, ThinkingLevel } from "./types";
 
 const uid = (prefix: string) => `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -52,7 +52,18 @@ export class AiActionsSettingTab extends PluginSettingTab {
     this.s.actions.forEach((a, i) => this.renderAction(containerEl, a, i));
     this.renderActionButtons(containerEl);
 
+    this.renderSaving(containerEl);
+
     new Setting(containerEl).setName("Long texts and network").setHeading();
+    new Setting(containerEl)
+      .setName("Stream answers")
+      .setDesc("Show the answer while it is being written. Providers that do not allow it fall back to waiting for the whole answer.")
+      .addToggle((t) =>
+        t.setValue(this.s.streaming).onChange(async (v) => {
+          this.s.streaming = v;
+          await this.save();
+        })
+      );
     this.numberSetting(containerEl, "Chunk size", "Texts longer than this many characters are sent in parts. 0 sends everything at once, for models with a large context window.", "chunkChars");
     this.numberSetting(containerEl, "Max output tokens", "Sent to Anthropic, which requires it. Other providers use their own limit.", "maxTokens");
     this.numberSetting(containerEl, "Timeout", "Seconds to wait for each request.", "timeoutSec");
@@ -335,6 +346,17 @@ export class AiActionsSettingTab extends PluginSettingTab {
       });
     });
 
+    new Setting(box)
+      .setName("Thinking")
+      .setDesc("How much the model reasons before answering. Lower is faster; summaries rarely need more than Low. Not every model accepts every level.")
+      .addDropdown((d) => {
+        for (const [k, label] of Object.entries(THINKING_LEVELS)) d.addOption(k, label);
+        d.setValue(a.thinking ?? "").onChange(async (v) => {
+          a.thinking = v as ThinkingLevel;
+          await this.save();
+        });
+      });
+
     const area = (name: string, key: "system" | "prompt" | "mergePrompt", rows: number) => {
       const s = new Setting(box).setName(name).addTextArea((t) => {
         t.inputEl.rows = rows;
@@ -356,7 +378,7 @@ export class AiActionsSettingTab extends PluginSettingTab {
     new Setting(el)
       .addButton((b) =>
         b.setButtonText("New action").setCta().onClick(async () => {
-          const a: Action = { id: uid("action"), name: "New action", model: "", system: "", prompt: "{{text}}", mergePrompt: "" };
+          const a: Action = { id: uid("action"), name: "New action", model: "", thinking: "", system: "", prompt: "{{text}}", mergePrompt: "" };
           this.s.actions.push(a);
           this.openActions.add(a.id);
           await this.save();
@@ -370,6 +392,45 @@ export class AiActionsSettingTab extends PluginSettingTab {
           new Notice(missing.length ? `Restored ${missing.length} action(s)` : "All built-in actions are already there.");
           await this.save();
           this.redraw();
+        })
+      );
+  }
+
+  private renderSaving(el: HTMLElement): void {
+    new Setting(el).setName("Saving answers").setHeading();
+    new Setting(el)
+      .setName("Folder")
+      .setDesc("Where Save as note puts new notes. Created if missing; empty means the vault root.")
+      .addText((t) =>
+        t.setPlaceholder("Inbox").setValue(this.s.saveFolder).onChange(async (v) => {
+          this.s.saveFolder = v.trim();
+          await this.save();
+        })
+      );
+    new Setting(el)
+      .setName("Note name")
+      .setDesc("Uses the same variables as prompts, plus {{action}}, {{date}} and {{time}}. Falls back to the action and date when the name comes out empty.")
+      .addText((t) =>
+        t.setValue(this.s.saveName).onChange(async (v) => {
+          this.s.saveName = v;
+          await this.save();
+        })
+      );
+    new Setting(el)
+      .setName("Add properties")
+      .setDesc("Write the action, model, date and the script's variables (such as title or url) as note properties.")
+      .addToggle((t) =>
+        t.setValue(this.s.saveFrontmatter).onChange(async (v) => {
+          this.s.saveFrontmatter = v;
+          await this.save();
+        })
+      );
+    new Setting(el)
+      .setName("Open after saving")
+      .addToggle((t) =>
+        t.setValue(this.s.openAfterSave).onChange(async (v) => {
+          this.s.openAfterSave = v;
+          await this.save();
         })
       );
   }
