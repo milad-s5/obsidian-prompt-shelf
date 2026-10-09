@@ -2,6 +2,7 @@ import { App, Notice, PluginSettingTab, Setting, TextComponent } from "obsidian"
 import type AiActionsPlugin from "./main";
 import { AiError } from "./ai/errors";
 import { ModelPicker } from "./ui/pickers";
+import { FolderSuggest } from "./ui/FolderSuggest";
 import { Action, DEFAULT_ACTIONS, PRESETS, PROVIDER_TYPES, Provider, ProviderType, THINKING_LEVELS, ThinkingLevel } from "./types";
 
 const uid = (prefix: string) => `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -130,12 +131,13 @@ export class AiActionsSettingTab extends PluginSettingTab {
 
     new Setting(box)
       .setName("Name")
-      .addText((t) =>
+      .addText((t) => {
         t.setValue(p.name).onChange(async (v) => {
           p.name = v;
           await this.save();
-        })
-      )
+        });
+        t.inputEl.addEventListener("change", () => this.redraw());
+      })
       .addExtraButton((b) =>
         b.setIcon("trash").setTooltip("Remove provider").onClick(async () => {
           this.s.providers = this.s.providers.filter((x) => x !== p);
@@ -167,17 +169,17 @@ export class AiActionsSettingTab extends PluginSettingTab {
 
     this.renderKey(box, p);
 
-    let modelsField: TextComponent | null = null;
     new Setting(box)
       .setName("Models")
       .setDesc("Comma-separated. The first one is this provider's default.")
       .addText((t) => {
-        modelsField = t;
         t.inputEl.addClass("aia-wide");
         t.setValue(p.models.join(", ")).onChange(async (v) => {
           p.models = v.split(",").map((m) => m.trim()).filter(Boolean);
           await this.save();
         });
+        // Every model dropdown on this page lists these, so redraw once editing is done
+        t.inputEl.addEventListener("change", () => this.redraw());
       });
 
     new Setting(box)
@@ -192,9 +194,9 @@ export class AiActionsSettingTab extends PluginSettingTab {
             }
             new ModelPicker(this.app, models, async (m) => {
               if (!p.models.includes(m.id)) p.models.push(m.id);
-              modelsField?.setValue(p.models.join(", "));
               await this.save();
               new Notice(`Added ${m.id}`);
+              this.redraw();
             }).open();
           } catch (e) {
             new Notice(errorText(e), 10000);
@@ -401,12 +403,14 @@ export class AiActionsSettingTab extends PluginSettingTab {
     new Setting(el)
       .setName("Folder")
       .setDesc("Where Save as note puts new notes. Created if missing; empty means the vault root.")
-      .addText((t) =>
-        t.setPlaceholder("Inbox").setValue(this.s.saveFolder).onChange(async (v) => {
-          this.s.saveFolder = v.trim();
+      .addText((t) => {
+        const store = async (v: string) => {
+          this.s.saveFolder = v.trim().replace(/^\/+|\/+$/g, "");
           await this.save();
-        })
-      );
+        };
+        t.setPlaceholder("Inbox").setValue(this.s.saveFolder).onChange(store);
+        new FolderSuggest(this.app, t.inputEl, (path) => void store(path));
+      });
     new Setting(el)
       .setName("Note name")
       .setDesc("Uses the same variables as prompts, plus {{action}}, {{date}} and {{time}}. Falls back to the action and date when the name comes out empty.")
