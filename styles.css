@@ -1,32 +1,32 @@
-/* AI Actions */
-.aia-muted {
+/* Prompt Shelf */
+.psh-muted {
   color: var(--text-muted);
   font-size: var(--font-ui-small);
 }
-.aia-row {
+.psh-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--size-4-2);
 }
-.aia-hidden {
+.psh-hidden {
   display: none;
 }
 
 /* Panel */
-.aia-panel select {
+.psh-panel select {
   max-width: 100%;
 }
-.aia-title {
+.psh-title {
   font-weight: var(--font-semibold);
 }
-.aia-status:not(:empty) {
+.psh-status:not(:empty) {
   margin-top: var(--size-4-2);
 }
-.aia-output {
+.psh-output {
   margin-top: var(--size-4-2);
 }
-.aia-result-body {
+.psh-result-body {
   padding: var(--size-4-2) var(--size-4-4);
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
@@ -38,15 +38,15 @@
   text-align: start;
   user-select: text;
 }
-.aia-meta {
+.psh-meta {
   margin-top: var(--size-4-1);
 }
-.aia-warning {
+.psh-warning {
   margin-top: var(--size-4-1);
   color: var(--text-warning);
   font-size: var(--font-ui-small);
 }
-.aia-error {
+.psh-error {
   padding: var(--size-4-2) var(--size-4-3);
   border: 1px solid var(--background-modifier-error);
   border-radius: var(--radius-m);
@@ -54,15 +54,15 @@
   font-size: var(--font-ui-small);
   user-select: text;
 }
-.aia-error ul {
+.psh-error ul {
   margin: var(--size-4-1) 0;
   padding-inline-start: var(--size-4-5);
 }
-.aia-error summary {
+.psh-error summary {
   cursor: pointer;
   color: var(--text-muted);
 }
-.aia-detail {
+.psh-detail {
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--text-muted);
@@ -71,47 +71,47 @@
 }
 
 /* Modal */
-.aia-modal .aia-result-body {
+.psh-modal .psh-result-body {
   max-height: 60vh;
 }
-.aia-buttons {
+.psh-buttons {
   margin-top: var(--size-4-3);
   justify-content: flex-end;
 }
 
 /* Settings */
-.aia-box {
+.psh-box {
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
   padding: 0 var(--size-4-3);
   margin-bottom: var(--size-4-3);
 }
-details.aia-box > summary {
+details.psh-box > summary {
   cursor: pointer;
   padding: var(--size-4-2) 0;
   font-weight: var(--font-semibold);
 }
-.aia-id {
+.psh-id {
   margin-inline-start: var(--size-4-2);
   font-weight: var(--font-normal);
   font-family: var(--font-monospace);
 }
-.aia-wide {
+.psh-wide {
   width: 100%;
   min-width: 240px;
 }
-.aia-stacked {
+.psh-stacked {
   flex-wrap: wrap;
 }
-.aia-stacked .setting-item-control {
+.psh-stacked .setting-item-control {
   flex: 1 1 100%;
   margin-top: var(--size-4-2);
 }
-.aia-fallbacks {
+.psh-fallbacks {
   margin: var(--size-4-1) 0 0;
   padding-inline-start: var(--size-4-5);
 }
-.aia-link {
+.psh-link {
   margin-inline-start: var(--size-4-2);
   padding: 0 var(--size-4-1);
   height: auto;
@@ -120,9 +120,9 @@ details.aia-box > summary {
   color: var(--text-accent);
   font-size: var(--font-ui-smaller);
 }
-.aia-result-actions {
+.psh-result-actions {
   margin-top: var(--size-4-2);
 }
-.aia-streaming {
+.psh-streaming {
   opacity: 0.92;
 }

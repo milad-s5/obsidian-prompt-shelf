@@ -1,4 +1,4 @@
-import type AiActionsPlugin from "../main";
+import type PromptShelfPlugin from "../main";
 import { Action, ThinkingLevel } from "../types";
 import { AiError } from "./errors";
 
@@ -58,7 +58,7 @@ export function splitText(text: string, max: number): string[] {
   return chunks;
 }
 
-export async function runAction(plugin: AiActionsPlugin, action: Action, input: string, opts: RunOptions = {}): Promise<RunResult> {
+export async function runAction(plugin: PromptShelfPlugin, action: Action, input: string, opts: RunOptions = {}): Promise<RunResult> {
   const text = String(input ?? "").trim();
   if (!text) throw new AiError("input", "There is no text to send.");
 

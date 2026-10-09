@@ -1,5 +1,5 @@
 import { requestUrl, RequestUrlResponse } from "obsidian";
-import type AiActionsPlugin from "../main";
+import type PromptShelfPlugin from "../main";
 import { Provider, ThinkingLevel } from "../types";
 import { ADAPTERS, Adapter, ChatMessage, HttpRequest, ModelInfo, ParsedReply } from "./adapters";
 import { AiError, combineFailures, httpError, toAiError } from "./errors";
@@ -51,7 +51,7 @@ const isLocal = (url: string): boolean => /^https?:\/\/(localhost|127\.0\.0\.1|\
 const stopped = () => new AiError("aborted", "Stopped.");
 
 export class AiClient {
-  constructor(private plugin: AiActionsPlugin) {}
+  constructor(private plugin: PromptShelfPlugin) {}
 
   label(t: Target): string {
     return `${t.provider.name} · ${t.model}`;
@@ -83,7 +83,7 @@ export class AiClient {
   async chat(req: ChatRequest): Promise<ChatResult> {
     const targets = this.candidates(req.model);
     if (!targets.length) {
-      throw new AiError("setup", "No model is set up yet. Add a provider, its API key and a model in AI Actions settings.");
+      throw new AiError("setup", "No model is set up yet. Add a provider, its API key and a model in Prompt Shelf settings.");
     }
     const failures: { label: string; error: AiError }[] = [];
     for (const t of targets) {
@@ -96,7 +96,7 @@ export class AiClient {
       } catch (e) {
         const error = toAiError(e, this.label(t));
         if (error.kind === "aborted") throw error;
-        console.warn("[ai-actions]", this.label(t), error.message, error.detail);
+        console.warn("[prompt-shelf]", this.label(t), error.message, error.detail);
         failures.push({ label: this.label(t), error });
         req.onDelta?.("");
       }
@@ -107,10 +107,10 @@ export class AiClient {
   async chatWith(t: Target, req: ChatRequest): Promise<ChatResult> {
     const label = this.label(t);
     const baseUrl = trimSlash(t.provider.baseUrl);
-    if (!baseUrl) throw new AiError("setup", `${t.provider.name} has no Base URL. Set it in AI Actions settings.`);
+    if (!baseUrl) throw new AiError("setup", `${t.provider.name} has no Base URL. Set it in Prompt Shelf settings.`);
     const key = this.plugin.keys.get(t.provider.id);
     if (!key && !isLocal(baseUrl)) {
-      throw new AiError("setup", `No API key saved for ${t.provider.name}. Add it in AI Actions settings.`);
+      throw new AiError("setup", `No API key saved for ${t.provider.name}. Add it in Prompt Shelf settings.`);
     }
     const adapter = ADAPTERS[t.provider.type] ?? ADAPTERS.openai;
     const build = (stream: boolean) => adapter.chat(baseUrl, key, {

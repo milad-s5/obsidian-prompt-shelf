@@ -1,6 +1,6 @@
 <div dir="rtl">
 
-# AI Actions
+# Prompt Shelf
 
 *[English](README.md)*
 
@@ -22,11 +22,11 @@
 
 ## استفاده
 
-**راست‌کلیک یا Command Palette**: متنی را انتخاب کنید (یا هیچ، برای کل نوت)، بعد راست‌کلیک کنید و *Run AI action on selection…* را بزنید، یا دستور *AI Actions: Run an action on the selection or the whole note* را از Command Palette اجرا کنید. یک کار را انتخاب کنید؛ جواب در پنجره‌ای باز می‌شود که می‌توانید کپی‌اش کنید، به‌صورت نوت ذخیره کنید، جای متن انتخاب‌شده بگذارید یا زیرش درج کنید.
+**راست‌کلیک یا Command Palette**: متنی را انتخاب کنید (یا هیچ، برای کل نوت)، بعد راست‌کلیک کنید و *Run AI action on selection…* را بزنید، یا دستور *Prompt Shelf: Run an action on the selection or the whole note* را از Command Palette اجرا کنید. یک کار را انتخاب کنید؛ جواب در پنجره‌ای باز می‌شود که می‌توانید کپی‌اش کنید، به‌صورت نوت ذخیره کنید، جای متن انتخاب‌شده بگذارید یا زیرش درج کنید.
 
 جواب همان‌طور که نوشته می‌شود نمایش داده می‌شود و دکمه‌ی **Stop** اجرا را وسط کار متوقف می‌کند.
 
-**از کد**: نمونه‌ها در [README انگلیسی](README.md#using-it) هست؛ `app.plugins.plugins["ai-actions"].api` با `run`، `chat`، `panel`، `pick` و `saveNote`. مثلاً این نوت زیرنویس یک ویدیو را نشان می‌دهد و با پنل آماده‌ی افزونه خلاصه‌اش می‌کند:
+**از کد**: نمونه‌ها در [README انگلیسی](README.md#using-it) هست؛ `app.plugins.plugins["prompt-shelf"].api` با `run`، `chat`، `panel`، `pick` و `saveNote`. مثلاً این نوت زیرنویس یک ویدیو را نشان می‌دهد و با پنل آماده‌ی افزونه خلاصه‌اش می‌کند:
 
 ![پنل داخل نوت که زیرنویس یک ویدیو را خلاصه می‌کند](./images/panel.png)
 

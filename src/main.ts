@@ -1,6 +1,6 @@
 import { Editor, MarkdownFileInfo, MarkdownView, Notice, Plugin, TFile } from "obsidian";
-import { AiActionsSettings, DEFAULT_ACTIONS, DEFAULT_SETTINGS } from "./types";
-import { AiActionsSettingTab } from "./settings";
+import { PromptShelfSettings, DEFAULT_ACTIONS, DEFAULT_SETTINGS } from "./types";
+import { PromptShelfSettingTab } from "./settings";
 import { KeyStore } from "./secrets/KeyStore";
 import { AiClient, ChatRequest, ChatResult, ModelOption } from "./ai/AiClient";
 import { RunOptions, RunResult, runAction } from "./ai/runAction";
@@ -15,7 +15,7 @@ interface SettingsWindow {
   openTabById(id: string): void;
 }
 
-export interface AiActionsApi {
+export interface PromptShelfApi {
   version: number;
   run(actionId: string, text: string, opts?: RunOptions): Promise<string>;
   runDetailed(actionId: string, text: string, opts?: RunOptions): Promise<RunResult>;
@@ -29,11 +29,11 @@ export interface AiActionsApi {
   openSettings(): void;
 }
 
-export default class AiActionsPlugin extends Plugin {
-  settings: AiActionsSettings;
+export default class PromptShelfPlugin extends Plugin {
+  settings: PromptShelfSettings;
   keys: KeyStore;
   client: AiClient;
-  api: AiActionsApi;
+  api: PromptShelfApi;
   results = new Map<string, RunResult>();
   panels = new Set<ActionPanel>();
 
@@ -57,7 +57,7 @@ export default class AiActionsPlugin extends Plugin {
       openSettings: () => this.openSettings(),
     };
 
-    this.addSettingTab(new AiActionsSettingTab(this.app, this));
+    this.addSettingTab(new PromptShelfSettingTab(this.app, this));
 
     this.addCommand({
       id: "run-action",
@@ -93,7 +93,7 @@ export default class AiActionsPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    const stored = ((await this.loadData()) ?? {}) as Partial<AiActionsSettings>;
+    const stored = ((await this.loadData()) ?? {}) as Partial<PromptShelfSettings>;
     this.settings = Object.assign({}, DEFAULT_SETTINGS, stored);
     if (!Array.isArray(stored.actions)) this.settings.actions = DEFAULT_ACTIONS.map((a) => ({ ...a }));
     for (const a of this.settings.actions) a.thinking = a.thinking ?? "";

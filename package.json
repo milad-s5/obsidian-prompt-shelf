@@ -1,5 +1,5 @@
 {
-  "name": "obsidian-ai-actions",
+  "name": "obsidian-prompt-shelf",
   "version": "1.0.0",
   "description": "Reusable AI prompts for Obsidian, runnable on any text from commands or dataviewjs",
   "main": "main.js",

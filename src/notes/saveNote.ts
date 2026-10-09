@@ -1,5 +1,5 @@
 import { moment, normalizePath, TFile } from "obsidian";
-import type AiActionsPlugin from "../main";
+import type PromptShelfPlugin from "../main";
 import { fillTemplate, Vars } from "../ai/runAction";
 
 export interface SaveOptions {
@@ -31,7 +31,7 @@ function frontmatter(fields: Record<string, unknown>): string {
   return lines.length ? `---\n${lines.join("\n")}\n---\n\n` : "";
 }
 
-async function ensureFolder(plugin: AiActionsPlugin, folder: string): Promise<void> {
+async function ensureFolder(plugin: PromptShelfPlugin, folder: string): Promise<void> {
   if (!folder || folder === "/") return;
   let path = "";
   for (const part of folder.split("/")) {
@@ -46,7 +46,7 @@ async function ensureFolder(plugin: AiActionsPlugin, folder: string): Promise<vo
   }
 }
 
-export async function saveAsNote(plugin: AiActionsPlugin, text: string, opts: SaveOptions = {}): Promise<TFile> {
+export async function saveAsNote(plugin: PromptShelfPlugin, text: string, opts: SaveOptions = {}): Promise<TFile> {
   const s = plugin.settings;
   const vars = typeof opts.vars === "function" ? opts.vars() : opts.vars ?? {};
   const now = moment();

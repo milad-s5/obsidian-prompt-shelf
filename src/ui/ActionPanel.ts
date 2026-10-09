@@ -1,5 +1,5 @@
 import { Notice } from "obsidian";
-import type AiActionsPlugin from "../main";
+import type PromptShelfPlugin from "../main";
 import { RunResult, Vars, runAction } from "../ai/runAction";
 import { saveAsNote } from "../notes/saveNote";
 import { Action } from "../types";
@@ -40,16 +40,16 @@ export class ActionPanel {
   private shown: string | null = null;
   private failures = new Map<string, unknown>();
 
-  constructor(private plugin: AiActionsPlugin, el: HTMLElement, private opts: PanelOptions) {
+  constructor(private plugin: PromptShelfPlugin, el: HTMLElement, private opts: PanelOptions) {
     this.el = el;
     this.id = opts.id ?? "default";
     const saved = plugin.settings.panels[this.id];
     this.actionId = saved?.action || opts.defaultAction || "";
     this.model = saved?.model ?? "";
 
-    el.addClass("aia-panel");
-    const row = el.createDiv({ cls: "aia-row" });
-    row.createSpan({ cls: "aia-title", text: opts.title ?? "AI" });
+    el.addClass("psh-panel");
+    const row = el.createDiv({ cls: "psh-row" });
+    row.createSpan({ cls: "psh-title", text: opts.title ?? "AI" });
     this.actionSelect = row.createEl("select", { cls: "dropdown" });
     this.actionSelect.onchange = () => {
       this.actionId = this.actionSelect.value;
@@ -66,7 +66,7 @@ export class ActionPanel {
     this.runButton.onclick = () => (this.running ? this.running.controller.abort() : void this.run());
     row.createEl("button", { text: "Settings" }).onclick = () => plugin.openSettings();
 
-    const actions = el.createDiv({ cls: "aia-row aia-result-actions" });
+    const actions = el.createDiv({ cls: "psh-row psh-result-actions" });
     const addResultButton = (text: string, onClick: (text: string, action: Action) => unknown) => {
       const b = actions.createEl("button", { text });
       b.onclick = async () => {
@@ -76,7 +76,7 @@ export class ActionPanel {
         try {
           await onClick(result, action);
         } catch (e) {
-          console.error("[ai-actions]", e);
+          console.error("[prompt-shelf]", e);
           new Notice(e instanceof Error ? e.message : String(e), 8000);
         }
       };
@@ -97,8 +97,8 @@ export class ActionPanel {
     });
     for (const b of opts.buttons ?? []) addResultButton(b.text, b.onClick);
 
-    this.status = el.createDiv({ cls: "aia-muted aia-status" });
-    this.output = el.createDiv({ cls: "aia-output" });
+    this.status = el.createDiv({ cls: "psh-muted psh-status" });
+    this.output = el.createDiv({ cls: "psh-output" });
 
     plugin.panels.add(this);
     this.refresh();
@@ -173,7 +173,7 @@ export class ActionPanel {
     this.output.empty();
     if (result) void renderResult(this.plugin.app, this.output, result);
     else if (failure) renderError(this.output, failure);
-    this.output.toggleClass("aia-hidden", !result && !failure);
+    this.output.toggleClass("psh-hidden", !result && !failure);
   }
 
   async run(): Promise<void> {
@@ -185,7 +185,7 @@ export class ActionPanel {
     this.failures.delete(key);
     this.shown = null;
     this.output.empty();
-    this.output.removeClass("aia-hidden");
+    this.output.removeClass("psh-hidden");
     this.refresh();
 
     const view = new StreamView(this.plugin.app, this.output);
@@ -208,7 +208,7 @@ export class ActionPanel {
       this.opts.onResult?.(result.text, action);
     } catch (e) {
       if (!controller.signal.aborted) {
-        console.error("[ai-actions]", e);
+        console.error("[prompt-shelf]", e);
         new Notice(`${action.name} failed: ${e instanceof Error ? e.message : String(e)}`, 10000);
       }
       this.failures.set(key, e);

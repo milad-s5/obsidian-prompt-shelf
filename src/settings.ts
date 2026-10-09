@@ -1,5 +1,5 @@
 import { App, Notice, PluginSettingTab, Setting, TextComponent } from "obsidian";
-import type AiActionsPlugin from "./main";
+import type PromptShelfPlugin from "./main";
 import { AiError } from "./ai/errors";
 import { ModelPicker } from "./ui/pickers";
 import { FolderSuggest } from "./ui/FolderSuggest";
@@ -9,10 +9,10 @@ const uid = (prefix: string) => `${prefix}-${Date.now().toString(36)}${Math.rand
 
 const errorText = (e: unknown) => (e instanceof AiError || e instanceof Error ? e.message : String(e));
 
-export class AiActionsSettingTab extends PluginSettingTab {
+export class PromptShelfSettingTab extends PluginSettingTab {
   private openActions = new Set<string>();
 
-  constructor(app: App, private plugin: AiActionsPlugin) {
+  constructor(app: App, private plugin: PromptShelfPlugin) {
     super(app, plugin);
   }
 
@@ -33,7 +33,7 @@ export class AiActionsSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.addClass("aia-settings");
+    containerEl.addClass("psh-settings");
 
     this.renderGeneral(containerEl);
 
@@ -88,11 +88,11 @@ export class AiActionsSettingTab extends PluginSettingTab {
     const fallback = new Setting(el)
       .setName("Fallback models")
       .setDesc("Tried in order when the chosen model fails, for example when a free model is rate limited.");
-    const list = fallback.descEl.createEl("ol", { cls: "aia-fallbacks" });
+    const list = fallback.descEl.createEl("ol", { cls: "psh-fallbacks" });
     this.s.fallbackModels.forEach((ref, i) => {
       const li = list.createEl("li");
       li.createSpan({ text: options.find((o) => o.ref === ref)?.label ?? `${ref} (missing)` });
-      const remove = li.createEl("button", { cls: "aia-link", text: "Remove" });
+      const remove = li.createEl("button", { cls: "psh-link", text: "Remove" });
       remove.onclick = async () => {
         this.s.fallbackModels.splice(i, 1);
         await this.save();
@@ -127,7 +127,7 @@ export class AiActionsSettingTab extends PluginSettingTab {
   }
 
   private renderProvider(el: HTMLElement, p: Provider): void {
-    const box = el.createDiv({ cls: "aia-box" });
+    const box = el.createDiv({ cls: "psh-box" });
 
     new Setting(box)
       .setName("Name")
@@ -158,7 +158,7 @@ export class AiActionsSettingTab extends PluginSettingTab {
     });
 
     new Setting(box).setName("Base URL").addText((t) => {
-      t.inputEl.addClass("aia-wide");
+      t.inputEl.addClass("psh-wide");
       t.setPlaceholder("Address ending in /v1")
         .setValue(p.baseUrl)
         .onChange(async (v) => {
@@ -173,7 +173,7 @@ export class AiActionsSettingTab extends PluginSettingTab {
       .setName("Models")
       .setDesc("Comma-separated. The first one is this provider's default.")
       .addText((t) => {
-        t.inputEl.addClass("aia-wide");
+        t.inputEl.addClass("psh-wide");
         t.setValue(p.models.join(", ")).onChange(async (v) => {
           p.models = v.split(",").map((m) => m.trim()).filter(Boolean);
           await this.save();
@@ -295,12 +295,12 @@ export class AiActionsSettingTab extends PluginSettingTab {
   }
 
   private renderAction(el: HTMLElement, a: Action, index: number): void {
-    const box = el.createEl("details", { cls: "aia-box" });
+    const box = el.createEl("details", { cls: "psh-box" });
     box.open = this.openActions.has(a.id);
     box.ontoggle = () => (box.open ? this.openActions.add(a.id) : this.openActions.delete(a.id));
     const summary = box.createEl("summary");
     const title = summary.createSpan({ text: a.name });
-    summary.createSpan({ cls: "aia-muted aia-id", text: a.id });
+    summary.createSpan({ cls: "psh-muted psh-id", text: a.id });
 
     new Setting(box)
       .setName("Name")
@@ -365,13 +365,13 @@ export class AiActionsSettingTab extends PluginSettingTab {
       const s = new Setting(box).setName(name).addTextArea((t) => {
         t.inputEl.rows = rows;
         t.inputEl.dir = "auto";
-        t.inputEl.addClass("aia-wide");
+        t.inputEl.addClass("psh-wide");
         t.setValue(a[key]).onChange(async (v) => {
           a[key] = v;
           await this.save();
         });
       });
-      s.settingEl.addClass("aia-stacked");
+      s.settingEl.addClass("psh-stacked");
     };
     area("System prompt", "system", 3);
     area("Prompt", "prompt", 8);

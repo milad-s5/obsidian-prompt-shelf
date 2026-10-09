@@ -1,5 +1,5 @@
 import { Editor, Modal, Notice } from "obsidian";
-import type AiActionsPlugin from "../main";
+import type PromptShelfPlugin from "../main";
 import { RunOptions, RunResult, runAction } from "../ai/runAction";
 import { saveAsNote } from "../notes/saveNote";
 import { Action } from "../types";
@@ -16,16 +16,16 @@ export class ResultModal extends Modal {
   private buttons: HTMLElement;
   private controller: AbortController | null = null;
 
-  constructor(private plugin: AiActionsPlugin, private action: Action, private text: string, private opts: ResultModalOptions = {}) {
+  constructor(private plugin: PromptShelfPlugin, private action: Action, private text: string, private opts: ResultModalOptions = {}) {
     super(plugin.app);
   }
 
   onOpen(): void {
-    this.modalEl.addClass("aia-modal");
+    this.modalEl.addClass("psh-modal");
     this.titleEl.setText(this.action.name);
-    this.status = this.contentEl.createDiv({ cls: "aia-muted" });
-    this.output = this.contentEl.createDiv({ cls: "aia-output" });
-    this.buttons = this.contentEl.createDiv({ cls: "aia-row aia-buttons" });
+    this.status = this.contentEl.createDiv({ cls: "psh-muted" });
+    this.output = this.contentEl.createDiv({ cls: "psh-output" });
+    this.buttons = this.contentEl.createDiv({ cls: "psh-row psh-buttons" });
     void this.run();
   }
 

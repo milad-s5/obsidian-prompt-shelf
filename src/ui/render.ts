@@ -22,12 +22,12 @@ export function releaseOutput(el: HTMLElement): void {
 
 export async function renderResult(app: App, el: HTMLElement, result: RunResult): Promise<void> {
   el.empty();
-  const body = el.createDiv({ cls: "aia-result-body", attr: { dir: "auto" } });
+  const body = el.createDiv({ cls: "psh-result-body", attr: { dir: "auto" } });
   await MarkdownRenderer.render(app, result.text, body, "", freshComponent(el));
   if (result.truncated) {
-    el.createDiv({ cls: "aia-warning", text: "The answer hit the output limit and is cut off." });
+    el.createDiv({ cls: "psh-warning", text: "The answer hit the output limit and is cut off." });
   }
-  el.createDiv({ cls: "aia-muted aia-meta", text: `${result.models.join(", ")} · ${result.text.length} characters` });
+  el.createDiv({ cls: "psh-muted psh-meta", text: `${result.models.join(", ")} · ${result.text.length} characters` });
 }
 
 /** Renders a streaming answer as markdown, at most a few times a second */
@@ -58,7 +58,7 @@ export class StreamView {
     if (this.stopped) return;
     if (!this.body || !this.el.contains(this.body)) {
       this.el.empty();
-      this.body = this.el.createDiv({ cls: "aia-result-body aia-streaming", attr: { dir: "auto" } });
+      this.body = this.el.createDiv({ cls: "psh-result-body psh-streaming", attr: { dir: "auto" } });
     }
     const next = createDiv();
     await MarkdownRenderer.render(this.app, this.latest, next, "", freshComponent(this.el));
@@ -71,7 +71,7 @@ export class StreamView {
 export function renderError(el: HTMLElement, err: unknown): void {
   el.empty();
   const e = err instanceof AiError ? err : null;
-  const box = el.createDiv({ cls: "aia-error" });
+  const box = el.createDiv({ cls: "psh-error" });
   box.createDiv({ text: e ? e.message : err instanceof Error ? err.message : String(err) });
   if (e?.attempts.length) {
     const list = box.createEl("ul");
@@ -80,7 +80,7 @@ export function renderError(el: HTMLElement, err: unknown): void {
   if (e?.detail) {
     const details = box.createEl("details");
     details.createEl("summary", { text: "Details" });
-    details.createEl("pre", { cls: "aia-detail", text: e.detail });
+    details.createEl("pre", { cls: "psh-detail", text: e.detail });
   }
 }
 

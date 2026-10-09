@@ -25,7 +25,7 @@ export interface PanelState {
   model: string;
 }
 
-export interface AiActionsSettings {
+export interface PromptShelfSettings {
   providers: Provider[];
   defaultModel: string;
   fallbackModels: string[];
@@ -114,7 +114,7 @@ export const DEFAULT_ACTIONS: Action[] = [
   },
 ];
 
-export const DEFAULT_SETTINGS: AiActionsSettings = {
+export const DEFAULT_SETTINGS: PromptShelfSettings = {
   providers: [],
   defaultModel: "",
   fallbackModels: [],
