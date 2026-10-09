@@ -1,0 +1,14 @@
+{
+  "id": "ai-actions",
+  "name": "AI Actions",
+  "version": "0.1.0",
+  "minAppVersion": "1.7.2",
+  "description": "Keep your AI providers, keys and reusable prompts in one place, and run them on any text from the command palette or from your own scripts.",
+  "author": "Milad Samimifar",
+  "authorUrl": "https://github.com/milad-s5",
+  "fundingUrl": {
+    "Buy Me a Coffeete": "https://www.coffeete.ir/milads55",
+    "Buy Me a BitCoffee": "https://buymeabitcoffee.vercel.app/btc/bc1qwxju09p2wywqqq8udj2am8csvn6r4p4z6720q3"
+  },
+  "isDesktopOnly": false
+}
