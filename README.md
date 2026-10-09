@@ -6,6 +6,8 @@ Keep your AI providers, API keys and reusable prompts in one place, and run them
 
 An **action** is a named prompt such as *Summarize*, *Translate* or *Clean up transcript*. Write it once in settings, then use it anywhere.
 
+![A long article selected in a note, summarized in a few lines next to it](./images/summarize.png)
+
 ## Providers
 
 - **OpenAI-compatible**: OpenRouter (including its free models), OpenAI, DeepSeek, Groq, Ollama and LM Studio, and any gateway that speaks the OpenAI chat API
@@ -14,13 +16,17 @@ An **action** is a named prompt such as *Summarize*, *Translate* or *Clean up tr
 
 Each provider has a **Browse models** button that lists what the service offers (free OpenRouter models are marked) and a **Test** button.
 
+![Providers, keys and fallback models in settings](./images/settings.png)
+
 ## Using it
 
 **Command palette** — *AI Actions: Run an action on the selection or the whole note*. Pick an action; the answer streams into a window where you can copy it, save it as a note, replace the selection or insert it below.
 
 Answers appear while they are being written, and a **Stop** button ends a run early. Providers that do not allow streaming from Obsidian fall back to waiting for the whole answer.
 
-**From a script** — the plugin exposes an API:
+**From a script** — the plugin exposes an API. Here a note shows a video's transcript and summarizes it with a ready-made panel:
+
+![A panel inside a note summarizing a video transcript](./images/panel.png)
 
 ```js
 const ai = app.plugins.plugins["ai-actions"]?.api;
@@ -67,6 +73,14 @@ Texts longer than **Chunk size** are sent in parts. If the action has a **merge 
 Errors say what happened in plain words — a rejected key, a rate-limited free model, a used-up quota, a model that does not exist, a text too long for the model, a region the provider does not serve, OpenRouter privacy settings that block free models — with the provider's own message under *Details*.
 
 Add **fallback models** in settings and a failed request moves on to the next one, which is handy with free models that are often rate limited.
+
+![A clear error after both models failed, with the provider's own message under Details](./images/errors.png)
+
+## Network
+
+Every request goes through Obsidian's `requestUrl`, except streamed answers: `requestUrl` cannot read a response as it arrives, so streaming uses `fetch`. When a provider does not allow that from Obsidian, the plugin falls back to `requestUrl` and waits for the whole answer. Streaming can be turned off in settings.
+
+Nothing is sent anywhere except to the providers you configure, and only when you run an action.
 
 ## About the keys
 
