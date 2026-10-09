@@ -40,7 +40,7 @@ export class AiActionsSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName("Providers").setHeading();
     containerEl.createEl("p", {
       cls: "setting-item-description",
-      text: "API keys are stored in the plugin's secret.json, not in data.json, and are never shown again after saving. Add that file to your sync or git ignore list.",
+      text: "API keys are stored in the plugin's secret.json, not in data.json, and are never shown again after saving. Add that file to your sync or Git ignore list.",
     });
     for (const p of this.s.providers) this.renderProvider(containerEl, p);
     this.renderAddProvider(containerEl);
@@ -159,7 +159,7 @@ export class AiActionsSettingTab extends PluginSettingTab {
 
     new Setting(box).setName("Base URL").addText((t) => {
       t.inputEl.addClass("aia-wide");
-      t.setPlaceholder("https://…/v1")
+      t.setPlaceholder("Address ending in /v1")
         .setValue(p.baseUrl)
         .onChange(async (v) => {
           p.baseUrl = v.trim();
@@ -192,11 +192,12 @@ export class AiActionsSettingTab extends PluginSettingTab {
               new Notice(`${p.name} returned no models.`);
               return;
             }
-            new ModelPicker(this.app, models, async (m) => {
+            new ModelPicker(this.app, models, (m) => {
               if (!p.models.includes(m.id)) p.models.push(m.id);
-              await this.save();
-              new Notice(`Added ${m.id}`);
-              this.redraw();
+              void this.save().then(() => {
+                new Notice(`Added ${m.id}`);
+                this.redraw();
+              });
             }).open();
           } catch (e) {
             new Notice(errorText(e), 10000);
@@ -262,14 +263,15 @@ export class AiActionsSettingTab extends PluginSettingTab {
     });
     setting.addButton((b) => b.setButtonText("Save").setCta().onClick(() => void saveKey()));
     if (has) {
-      setting.addButton((b) =>
-        b.setButtonText("Clear").setWarning().onClick(async () => {
+      setting.addButton((b) => {
+        b.buttonEl.addClass("mod-warning");
+        b.setButtonText("Clear").onClick(async () => {
           await this.plugin.keys.clear(p.id);
           new Notice(`Key cleared for ${p.name}`);
           this.plugin.refreshPanels();
           this.redraw();
-        })
-      );
+        });
+      });
     }
   }
 
@@ -279,7 +281,7 @@ export class AiActionsSettingTab extends PluginSettingTab {
       .setName("Add a provider")
       .setDesc("Any OpenAI-compatible service works through the custom option.")
       .addDropdown((d) => {
-        PRESETS.forEach((x, i) => d.addOption(String(i), x.name));
+        for (const [i, x] of PRESETS.entries()) d.addOption(String(i), x.name);
         d.onChange((v) => (preset = Number(v)));
       })
       .addButton((b) =>
@@ -326,8 +328,8 @@ export class AiActionsSettingTab extends PluginSettingTab {
       );
 
     new Setting(box)
-      .setName("Id")
-      .setDesc('Scripts call the action by this id, e.g. api.run("summarize", text).')
+      .setName("ID")
+      .setDesc('The ID scripts use to call this action, as in run("summarize", text).')
       .addText((t) =>
         t.setValue(a.id).onChange(async (v) => {
           const id = v.trim();
@@ -350,7 +352,7 @@ export class AiActionsSettingTab extends PluginSettingTab {
 
     new Setting(box)
       .setName("Thinking")
-      .setDesc("How much the model reasons before answering. Lower is faster; summaries rarely need more than Low. Not every model accepts every level.")
+      .setDesc("How much the model reasons before answering. Lower is faster; summaries rarely need more than low. Not every model accepts every level.")
       .addDropdown((d) => {
         for (const [k, label] of Object.entries(THINKING_LEVELS)) d.addOption(k, label);
         d.setValue(a.thinking ?? "").onChange(async (v) => {
@@ -402,7 +404,7 @@ export class AiActionsSettingTab extends PluginSettingTab {
     new Setting(el).setName("Saving answers").setHeading();
     new Setting(el)
       .setName("Folder")
-      .setDesc("Where Save as note puts new notes. Created if missing; empty means the vault root.")
+      .setDesc("Where saved answers go. Created if missing; empty means the vault root.")
       .addText((t) => {
         const store = async (v: string) => {
           this.s.saveFolder = v.trim().replace(/^\/+|\/+$/g, "");
@@ -422,7 +424,7 @@ export class AiActionsSettingTab extends PluginSettingTab {
       );
     new Setting(el)
       .setName("Add properties")
-      .setDesc("Write the action, model, date and the script's variables (such as title or url) as note properties.")
+      .setDesc("Write the action, model, date and the script's variables (such as title or URL) as note properties.")
       .addToggle((t) =>
         t.setValue(this.s.saveFrontmatter).onChange(async (v) => {
           this.s.saveFrontmatter = v;

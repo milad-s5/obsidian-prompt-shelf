@@ -3,7 +3,7 @@ import type AiActionsPlugin from "../main";
 import { RunOptions, RunResult, runAction } from "../ai/runAction";
 import { saveAsNote } from "../notes/saveNote";
 import { Action } from "../types";
-import { StreamView, copyText, renderError, renderResult } from "./render";
+import { StreamView, copyText, releaseOutput, renderError, renderResult } from "./render";
 
 export interface ResultModalOptions extends RunOptions {
   editor?: Editor;
@@ -31,6 +31,7 @@ export class ResultModal extends Modal {
 
   onClose(): void {
     this.controller?.abort();
+    releaseOutput(this.output);
     this.contentEl.empty();
   }
 
@@ -41,7 +42,7 @@ export class ResultModal extends Modal {
     this.controller = controller;
     this.buttons.createEl("button", { text: "Stop", cls: "mod-warning" }).onclick = () => controller.abort();
 
-    const view = new StreamView(this.app, this.plugin, this.output);
+    const view = new StreamView(this.app, this.output);
     let result: RunResult | null = null;
     try {
       result = await runAction(this.plugin, this.action, this.text, {
@@ -52,7 +53,7 @@ export class ResultModal extends Modal {
       });
       view.stop();
       this.status.setText("");
-      await renderResult(this.app, this.plugin, this.output, result);
+      await renderResult(this.app, this.output, result);
     } catch (e) {
       view.stop();
       this.status.setText("");

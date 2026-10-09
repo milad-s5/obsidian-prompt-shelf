@@ -3,6 +3,7 @@ import type AiActionsPlugin from "../main";
 import { Provider, ThinkingLevel } from "../types";
 import { ADAPTERS, Adapter, ChatMessage, HttpRequest, ModelInfo, ParsedReply } from "./adapters";
 import { AiError, combineFailures, httpError, toAiError } from "./errors";
+import { obj, parseJson, str } from "./json";
 
 export interface ChatRequest {
   prompt?: string;
@@ -37,9 +38,10 @@ export interface ModelOption {
 export const makeRef = (providerId: string, model: string): string => `${providerId}|${model}`;
 
 export function parseRef(ref: string | undefined): { providerId: string; model: string } | null {
-  const i = (ref ?? "").indexOf("|");
+  if (!ref) return null;
+  const i = ref.indexOf("|");
   if (i <= 0) return null;
-  return { providerId: ref!.slice(0, i), model: ref!.slice(i + 1) };
+  return { providerId: ref.slice(0, i), model: ref.slice(i + 1) };
 }
 
 const trimSlash = (s: string): string => s.trim().replace(/\/+$/, "");
@@ -63,8 +65,9 @@ export class AiClient {
 
   resolve(ref: string | undefined): Target | null {
     const r = parseRef(ref);
-    const provider = r && this.plugin.settings.providers.find((p) => p.id === r.providerId);
-    return provider && r!.model ? { provider, model: r!.model } : null;
+    if (!r?.model) return null;
+    const provider = this.plugin.settings.providers.find((p) => p.id === r.providerId);
+    return provider ? { provider, model: r.model } : null;
   }
 
   /** The requested model, then the default, then the fallbacks, without repeats */
@@ -191,13 +194,13 @@ export class AiClient {
     try {
       if (!res.ok) {
         const raw = await res.text();
-        throw httpError(res.status, safeJson(raw), raw, label);
+        throw httpError(res.status, parseJson(raw), raw, label);
       }
       if (!(res.headers.get("content-type") ?? "").includes("event-stream") || !res.body) {
         const raw = await res.text();
-        const json = safeJson(raw);
-        if (json === null) throw new AiError("request", `${label} sent back something that is not JSON. Check the provider's Base URL.`, raw.slice(0, 600));
-        if (json.error) throw httpError(errorStatus(json), json, raw, label);
+        const json = parseJson(raw);
+        if (json === undefined) throw new AiError("request", `${label} sent back something that is not JSON. Check the provider's Base URL.`, raw.slice(0, 600));
+        if (obj(json).error) throw httpError(errorStatus(json), json, raw, label);
         return adapter.parse(json);
       }
 
@@ -212,8 +215,8 @@ export class AiClient {
         const payload = data.join("\n");
         data = [];
         if (payload === "[DONE]") return;
-        const json = safeJson(payload);
-        if (json === null) return;
+        const json = parseJson(payload);
+        if (json === undefined) return;
         const ev = adapter.streamEvent(json);
         if (ev.error) throw httpError(errorStatus(ev.error), ev.error, payload, label);
         if (ev.truncated) reply.truncated = true;
@@ -248,7 +251,7 @@ export class AiClient {
     }
   }
 
-  private async send(req: HttpRequest, label: string, signal?: AbortSignal): Promise<any> {
+  private async send(req: HttpRequest, label: string, signal?: AbortSignal): Promise<unknown> {
     const seconds = this.plugin.settings.timeoutSec || 180;
     let res: RequestUrlResponse;
     try {
@@ -276,30 +279,23 @@ export class AiClient {
     } catch {
       raw = "";
     }
-    const json = safeJson(raw);
+    const json = parseJson(raw);
     if (res.status < 200 || res.status >= 300) throw httpError(res.status, json, raw, label);
-    if (json?.error) throw httpError(errorStatus(json), json, raw, label);
-    if (json === null) {
+    if (obj(json).error) throw httpError(errorStatus(json), json, raw, label);
+    if (json === undefined) {
       throw new AiError("request", `${label} sent back something that is not JSON. Check the provider's Base URL.`, raw.slice(0, 600));
     }
     return json;
   }
 }
 
-function safeJson(raw: string): any {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-function errorStatus(json: any): number {
-  const e = json?.error ?? json;
-  const code = Number(e?.code ?? e?.status);
+function errorStatus(json: unknown): number {
+  const root = obj(json);
+  const e = root.error === undefined ? root : obj(root.error);
+  const code = Number(e.code ?? e.status);
   if (code >= 400 && code < 600) return code;
-  if (/overloaded/i.test(String(e?.type ?? ""))) return 529;
-  if (/rate_limit/i.test(String(e?.type ?? ""))) return 429;
+  if (/overloaded/i.test(str(e.type))) return 529;
+  if (/rate_limit/i.test(str(e.type))) return 429;
   return 400;
 }
 

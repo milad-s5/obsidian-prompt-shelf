@@ -10,6 +10,11 @@ import { ActionPicker } from "./ui/pickers";
 import { ResultModal } from "./ui/ResultModal";
 import { SaveOptions, saveAsNote } from "./notes/saveNote";
 
+interface SettingsWindow {
+  open(): void;
+  openTabById(id: string): void;
+}
+
 export interface AiActionsApi {
   version: number;
   run(actionId: string, text: string, opts?: RunOptions): Promise<string>;
@@ -70,13 +75,14 @@ export default class AiActionsPlugin extends Plugin {
   }
 
   onunload(): void {
+    for (const panel of this.panels) panel.dispose();
     this.panels.clear();
   }
 
   async loadSettings(): Promise<void> {
     const stored = ((await this.loadData()) ?? {}) as Partial<AiActionsSettings>;
     this.settings = Object.assign({}, DEFAULT_SETTINGS, stored);
-    if (!Array.isArray(stored.actions)) this.settings.actions = JSON.parse(JSON.stringify(DEFAULT_ACTIONS));
+    if (!Array.isArray(stored.actions)) this.settings.actions = DEFAULT_ACTIONS.map((a) => ({ ...a }));
     for (const a of this.settings.actions) a.thinking = a.thinking ?? "";
     this.settings.panels = { ...(stored.panels ?? {}) };
   }
@@ -89,12 +95,15 @@ export default class AiActionsPlugin extends Plugin {
   refreshPanels(): void {
     for (const panel of this.panels) {
       if (panel.el.isConnected) panel.refresh();
-      else this.panels.delete(panel);
+      else {
+        panel.dispose();
+        this.panels.delete(panel);
+      }
     }
   }
 
   openSettings(): void {
-    const setting = (this.app as any).setting;
+    const setting = (this.app as unknown as { setting?: SettingsWindow }).setting;
     setting?.open();
     setting?.openTabById(this.manifest.id);
   }

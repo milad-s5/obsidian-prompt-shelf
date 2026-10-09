@@ -3,7 +3,7 @@ import type AiActionsPlugin from "../main";
 import { RunResult, Vars, runAction } from "../ai/runAction";
 import { saveAsNote } from "../notes/saveNote";
 import { Action } from "../types";
-import { StreamView, copyText, renderError, renderResult } from "./render";
+import { StreamView, copyText, releaseOutput, renderError, renderResult } from "./render";
 
 export interface PanelButton {
   text: string;
@@ -104,6 +104,11 @@ export class ActionPanel {
     this.refresh();
   }
 
+  dispose(): void {
+    this.running?.controller.abort();
+    releaseOutput(this.output);
+  }
+
   /** The answer currently shown, if any */
   result(): string | null {
     const key = this.resultKey();
@@ -166,7 +171,7 @@ export class ActionPanel {
     if (shown === this.shown) return;
     this.shown = shown;
     this.output.empty();
-    if (result) void renderResult(this.plugin.app, this.plugin, this.output, result);
+    if (result) void renderResult(this.plugin.app, this.output, result);
     else if (failure) renderError(this.output, failure);
     this.output.toggleClass("aia-hidden", !result && !failure);
   }
@@ -183,7 +188,7 @@ export class ActionPanel {
     this.output.removeClass("aia-hidden");
     this.refresh();
 
-    const view = new StreamView(this.plugin.app, this.plugin, this.output);
+    const view = new StreamView(this.plugin.app, this.output);
     const visible = () => this.resultKey() === key;
     const started = Date.now();
     try {

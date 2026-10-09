@@ -26,7 +26,13 @@ export interface RunResult {
  * disappears cleanly. Without a {{text}} placeholder the text is appended.
  */
 export function fillTemplate(template: string, vars: Vars, appendText: boolean): string {
-  const value = (k: string) => (vars[k] == null ? "" : String(vars[k]));
+  const value = (k: string): string => {
+    const v = vars[k];
+    if (v == null) return "";
+    if (typeof v === "string") return v;
+    if (typeof v === "number" || typeof v === "boolean") return String(v);
+    return JSON.stringify(v);
+  };
   const keep = (line: string) => {
     const names = [...line.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]).filter((k) => k !== "text");
     return !names.length || names.some((k) => value(k).trim());

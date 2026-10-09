@@ -1,4 +1,5 @@
 import { ProviderType, ThinkingLevel } from "../types";
+import { arr, obj, str } from "./json";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -42,10 +43,10 @@ export interface ModelInfo {
 
 export interface Adapter {
   chat(baseUrl: string, key: string, params: ChatParams): HttpRequest;
-  parse(json: any): ParsedReply;
-  streamEvent(json: any): StreamEvent;
+  parse(json: unknown): ParsedReply;
+  streamEvent(json: unknown): StreamEvent;
   models(baseUrl: string, key: string): HttpRequest;
-  parseModels(json: any): ModelInfo[];
+  parseModels(json: unknown): ModelInfo[];
 }
 
 const bearer = (key: string): Record<string, string> => (key ? { Authorization: `Bearer ${key}` } : {});
@@ -67,22 +68,22 @@ const openai: Adapter = {
     return { url: `${baseUrl}/chat/completions`, method: "POST", headers: bearer(key), body };
   },
   parse(json) {
-    const choice = json.choices?.[0];
-    const content = choice?.message?.content;
-    const text = typeof content === "string" ? content
-      : Array.isArray(content) ? content.map((c: any) => c.text ?? "").join("") : "";
+    const choice = obj(arr(obj(json).choices)[0]);
+    const content = obj(choice.message).content;
+    const text = Array.isArray(content) ? arr(content).map((c) => str(obj(c).text)).join("") : str(content);
+    const finish = str(choice.finish_reason);
     return {
       text,
-      truncated: choice?.finish_reason === "length",
-      blocked: choice?.finish_reason === "content_filter" ? "content filter" : "",
+      truncated: finish === "length",
+      blocked: finish === "content_filter" ? "content filter" : "",
     };
   },
   streamEvent(json) {
-    if (json.error) return { error: json };
-    const choice = json.choices?.[0];
-    const finish = choice?.finish_reason;
+    if (obj(json).error) return { error: json };
+    const choice = obj(arr(obj(json).choices)[0]);
+    const finish = str(choice.finish_reason);
     return {
-      text: typeof choice?.delta?.content === "string" ? choice.delta.content : "",
+      text: str(obj(choice.delta).content),
       truncated: finish === "length" || undefined,
       blocked: finish === "content_filter" ? "content filter" : undefined,
     };
@@ -91,10 +92,12 @@ const openai: Adapter = {
     return { url: `${baseUrl}/models`, method: "GET", headers: bearer(key) };
   },
   parseModels(json) {
-    return (json.data ?? []).map((m: any) => ({
-      id: String(m.id),
-      free: String(m.id).endsWith(":free") || (m.pricing?.prompt === "0" && m.pricing?.completion === "0"),
-    }));
+    return arr(obj(json).data).map((raw) => {
+      const m = obj(raw);
+      const id = str(m.id);
+      const pricing = obj(m.pricing);
+      return { id, free: id.endsWith(":free") || (pricing.prompt === "0" && pricing.completion === "0") };
+    });
   },
 };
 
@@ -121,17 +124,21 @@ const anthropic: Adapter = {
     return { url: `${baseUrl}/messages`, method: "POST", headers: { "x-api-key": key, ...ANTHROPIC_HEADERS }, body };
   },
   parse(json) {
+    const j = obj(json);
+    const stop = str(j.stop_reason);
     return {
-      text: (json.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join(""),
-      truncated: json.stop_reason === "max_tokens",
-      blocked: json.stop_reason === "refusal" ? "refusal" : "",
+      text: arr(j.content).map(obj).filter((c) => c.type === "text").map((c) => str(c.text)).join(""),
+      truncated: stop === "max_tokens",
+      blocked: stop === "refusal" ? "refusal" : "",
     };
   },
   streamEvent(json) {
-    if (json.type === "error") return { error: json };
-    if (json.type === "content_block_delta" && json.delta?.type === "text_delta") return { text: json.delta.text ?? "" };
-    if (json.type === "message_delta") {
-      const stop = json.delta?.stop_reason;
+    const j = obj(json);
+    const delta = obj(j.delta);
+    if (j.type === "error") return { error: json };
+    if (j.type === "content_block_delta" && delta.type === "text_delta") return { text: str(delta.text) };
+    if (j.type === "message_delta") {
+      const stop = str(delta.stop_reason);
       return { truncated: stop === "max_tokens" || undefined, blocked: stop === "refusal" ? "refusal" : undefined };
     }
     return {};
@@ -140,7 +147,7 @@ const anthropic: Adapter = {
     return { url: `${baseUrl}/models?limit=1000`, method: "GET", headers: { "x-api-key": key, ...ANTHROPIC_HEADERS } };
   },
   parseModels(json) {
-    return (json.data ?? []).map((m: any) => ({ id: String(m.id), free: false }));
+    return arr(obj(json).data).map((m) => ({ id: str(obj(m).id), free: false }));
   },
 };
 
@@ -152,13 +159,14 @@ function geminiThinking(model: string, level: ThinkingLevel): Record<string, unk
   return { thinkingLevel: level === "off" ? "minimal" : level };
 }
 
-function geminiReply(json: any): ParsedReply {
-  const cand = json.candidates?.[0];
-  const finish = String(cand?.finishReason ?? "");
+function geminiReply(json: unknown): ParsedReply {
+  const j = obj(json);
+  const cand = obj(arr(j.candidates)[0]);
+  const finish = str(cand.finishReason);
   return {
-    text: (cand?.content?.parts ?? []).filter((x: any) => !x.thought).map((x: any) => x.text ?? "").join(""),
+    text: arr(obj(cand.content).parts).map(obj).filter((x) => !x.thought).map((x) => str(x.text)).join(""),
     truncated: finish === "MAX_TOKENS",
-    blocked: json.promptFeedback?.blockReason
+    blocked: str(obj(j.promptFeedback).blockReason)
       || (/SAFETY|PROHIBITED|BLOCKLIST|RECITATION/.test(finish) ? finish.toLowerCase() : ""),
   };
 }
@@ -182,7 +190,7 @@ const gemini: Adapter = {
   },
   parse: geminiReply,
   streamEvent(json) {
-    if (json.error) return { error: json };
+    if (obj(json).error) return { error: json };
     const r = geminiReply(json);
     return { text: r.text, truncated: r.truncated || undefined, blocked: r.blocked || undefined };
   },
@@ -190,9 +198,10 @@ const gemini: Adapter = {
     return { url: `${baseUrl}/models?pageSize=1000`, method: "GET", headers: { "x-goog-api-key": key } };
   },
   parseModels(json) {
-    return (json.models ?? [])
-      .filter((m: any) => (m.supportedGenerationMethods ?? []).includes("generateContent"))
-      .map((m: any) => ({ id: String(m.name).replace(/^models\//, ""), free: false }));
+    return arr(obj(json).models)
+      .map(obj)
+      .filter((m) => arr(m.supportedGenerationMethods).includes("generateContent"))
+      .map((m) => ({ id: str(m.name).replace(/^models\//, ""), free: false }));
   },
 };
 

@@ -4,10 +4,26 @@ import { RunResult } from "../ai/runAction";
 
 const STREAM_RENDER_MS = 150;
 
-export async function renderResult(app: App, component: Component, el: HTMLElement, result: RunResult): Promise<void> {
+/** Each output element owns one component, replaced on every render so nothing outlives it */
+const owners = new WeakMap<HTMLElement, Component>();
+
+function freshComponent(el: HTMLElement): Component {
+  owners.get(el)?.unload();
+  const component = new Component();
+  component.load();
+  owners.set(el, component);
+  return component;
+}
+
+export function releaseOutput(el: HTMLElement): void {
+  owners.get(el)?.unload();
+  owners.delete(el);
+}
+
+export async function renderResult(app: App, el: HTMLElement, result: RunResult): Promise<void> {
   el.empty();
   const body = el.createDiv({ cls: "aia-result-body", attr: { dir: "auto" } });
-  await MarkdownRenderer.render(app, result.text, body, "", component);
+  await MarkdownRenderer.render(app, result.text, body, "", freshComponent(el));
   if (result.truncated) {
     el.createDiv({ cls: "aia-warning", text: "The answer hit the output limit and is cut off." });
   }
@@ -21,7 +37,7 @@ export class StreamView {
   private body: HTMLElement | null = null;
   private stopped = false;
 
-  constructor(private app: App, private component: Component, private el: HTMLElement) {}
+  constructor(private app: App, private el: HTMLElement) {}
 
   update(text: string): void {
     this.latest = text;
@@ -45,7 +61,7 @@ export class StreamView {
       this.body = this.el.createDiv({ cls: "aia-result-body aia-streaming", attr: { dir: "auto" } });
     }
     const next = createDiv();
-    await MarkdownRenderer.render(this.app, this.latest, next, "", this.component);
+    await MarkdownRenderer.render(this.app, this.latest, next, "", freshComponent(this.el));
     if (this.stopped) return;
     this.body.replaceChildren(...Array.from(next.childNodes));
     this.body.scrollTop = this.body.scrollHeight;

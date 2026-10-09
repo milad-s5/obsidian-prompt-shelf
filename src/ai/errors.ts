@@ -1,3 +1,5 @@
+import { arr, obj, str } from "./json";
+
 export type AiErrorKind =
   | "setup"
   | "input"
@@ -40,18 +42,19 @@ export function combineFailures(failures: { label: string; error: AiError }[]): 
 }
 
 function extractMessage(json: unknown): string {
-  const root = (Array.isArray(json) ? json[0] : json) as Record<string, any> | null;
-  if (!root || typeof root !== "object") return "";
+  const root = obj(Array.isArray(json) ? arr(json)[0] : json);
   const parts: string[] = [];
-  const e = root.error;
-  if (typeof e === "string") parts.push(e);
-  else if (e && typeof e === "object") {
-    if (e.message) parts.push(String(e.message));
-    if (e.metadata?.raw) parts.push(String(e.metadata.raw));
-    if (e.status && !e.message) parts.push(String(e.status));
+  if (typeof root.error === "string") parts.push(root.error);
+  else {
+    const e = obj(root.error);
+    const message = str(e.message);
+    if (message) parts.push(message);
+    const raw = str(obj(e.metadata).raw);
+    if (raw) parts.push(raw);
+    if (!message && str(e.status)) parts.push(str(e.status));
   }
-  if (typeof root.message === "string") parts.push(root.message);
-  if (typeof root.detail === "string") parts.push(root.detail);
+  if (str(root.message)) parts.push(str(root.message));
+  if (str(root.detail)) parts.push(str(root.detail));
   return parts.join(" — ");
 }
 
