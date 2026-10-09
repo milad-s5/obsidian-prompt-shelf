@@ -20,7 +20,7 @@ Each provider has a **Browse models** button that lists what the service offers 
 
 ## Using it
 
-**Command palette** — *AI Actions: Run an action on the selection or the whole note*. Pick an action; the answer streams into a window where you can copy it, save it as a note, replace the selection or insert it below.
+**Right-click or command palette** — select some text (or nothing, for the whole note), then right-click and choose *Run AI action on selection…*, or run *AI Actions: Run an action on the selection or the whole note* from the command palette. Pick an action; the answer streams into a window where you can copy it, save it as a note, replace the selection or insert it below.
 
 Answers appear while they are being written, and a **Stop** button ends a run early. Providers that do not allow streaming from Obsidian fall back to waiting for the whole answer.
 

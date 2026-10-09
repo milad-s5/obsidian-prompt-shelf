@@ -62,16 +62,29 @@ export default class AiActionsPlugin extends Plugin {
     this.addCommand({
       id: "run-action",
       name: "Run an action on the selection or the whole note",
-      editorCallback: (editor: Editor, ctx: MarkdownView | MarkdownFileInfo) => {
-        const selection = editor.getSelection();
-        const text = selection || editor.getValue();
-        if (!text.trim()) {
-          new Notice("There is no text to send.");
-          return;
-        }
-        this.pick(text, { vars: { title: ctx.file?.basename ?? "" } }, editor, Boolean(selection));
-      },
+      editorCallback: (editor: Editor, ctx: MarkdownView | MarkdownFileInfo) => this.runOnEditor(editor, ctx),
     });
+
+    this.registerEvent(
+      this.app.workspace.on("editor-menu", (menu, editor, ctx) => {
+        menu.addItem((item) =>
+          item
+            .setTitle(editor.somethingSelected() ? "Run AI action on selection…" : "Run AI action on note…")
+            .setIcon("sparkles")
+            .onClick(() => this.runOnEditor(editor, ctx))
+        );
+      })
+    );
+  }
+
+  private runOnEditor(editor: Editor, ctx: MarkdownView | MarkdownFileInfo): void {
+    const selection = editor.getSelection();
+    const text = selection || editor.getValue();
+    if (!text.trim()) {
+      new Notice("There is no text to send.");
+      return;
+    }
+    this.pick(text, { vars: { title: ctx.file?.basename ?? "" } }, editor, Boolean(selection));
   }
 
   onunload(): void {
