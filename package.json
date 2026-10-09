@@ -1,6 +1,6 @@
 {
   "name": "obsidian-ai-actions",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Reusable AI prompts for Obsidian, runnable on any text from commands or dataviewjs",
   "main": "main.js",
   "scripts": {
