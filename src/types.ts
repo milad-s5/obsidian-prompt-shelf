@@ -49,7 +49,7 @@ export const PROVIDER_TYPES: Record<ProviderType, string> = {
 
 export const PRESETS: ProviderPreset[] = [
   { name: "OpenRouter", type: "openai", baseUrl: "https://openrouter.ai/api/v1", models: ["openrouter/free"] },
-  { name: "Google Gemini", type: "gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta", models: ["gemini-2.5-flash"] },
+  { name: "Google Gemini", type: "gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta", models: ["gemini-flash-latest"] },
   { name: "OpenAI", type: "openai", baseUrl: "https://api.openai.com/v1", models: ["gpt-5-mini"] },
   { name: "Anthropic", type: "anthropic", baseUrl: "https://api.anthropic.com/v1", models: ["claude-haiku-5-5"] },
   { name: "DeepSeek", type: "openai", baseUrl: "https://api.deepseek.com/v1", models: ["deepseek-chat"] },
