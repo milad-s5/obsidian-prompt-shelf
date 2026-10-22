@@ -46,6 +46,10 @@ export interface PromptShelfSettings {
   saveName: string;
   saveFrontmatter: boolean;
   openAfterSave: boolean;
+  /** "providerId|model" refs tried in order; empty means the built-in defaults */
+  speechModels: string[];
+  speechVoice: string;
+  speechRate: number;
   panels: Record<string, PanelState>;
 }
 
@@ -135,5 +139,8 @@ export const DEFAULT_SETTINGS: PromptShelfSettings = {
   saveName: "{{title}} - {{action}}",
   saveFrontmatter: true,
   openAfterSave: true,
+  speechModels: [],
+  speechVoice: "",
+  speechRate: 1,
   panels: {},
 };

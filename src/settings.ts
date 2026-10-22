@@ -4,6 +4,8 @@ import { AiError } from "./ai/errors";
 import { ModelPicker } from "./ui/pickers";
 import { FolderSuggest } from "./ui/FolderSuggest";
 import { Capability, accepts } from "./ai/capabilities";
+import { DEFAULT_VOICES } from "./speech/synth";
+import { makeRef } from "./ai/AiClient";
 import { Action, DEFAULT_ACTIONS, PRESETS, PROVIDER_TYPES, Provider, ProviderType, THINKING_LEVELS, ThinkingLevel } from "./types";
 
 const uid = (prefix: string) => `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -55,6 +57,7 @@ export class PromptShelfSettingTab extends PluginSettingTab {
     this.renderActionButtons(containerEl);
 
     this.renderSaving(containerEl);
+    this.renderSpeech(containerEl);
 
     new Setting(containerEl).setName("Long texts and network").setHeading();
     new Setting(containerEl)
@@ -420,6 +423,76 @@ export class PromptShelfSettingTab extends PluginSettingTab {
           new Notice(missing.length ? `Restored ${missing.length} action(s)` : "All built-in actions are already there.");
           await this.save();
           this.redraw();
+        })
+      );
+  }
+
+  private renderSpeech(el: HTMLElement): void {
+    new Setting(el).setName("Read aloud").setHeading();
+    const auto = this.s.speechModels.length === 0;
+    const targets = this.plugin.synth.targets();
+    const models = new Setting(el)
+      .setName("Speech models")
+      .setDesc(auto
+        ? targets.length
+          ? `Automatic: ${targets.map((t) => this.plugin.synth.label(t)).join(", ")}. Add models here to choose them yourself.`
+          : "Add a Gemini provider with a key, or an OpenAI one, and its speech models are used automatically. Or add models here."
+        : "Tried in order. A model whose daily quota is used up, or that is not available, is skipped.");
+    if (!auto) {
+      const list = models.descEl.createEl("ol", { cls: "psh-fallbacks" });
+      this.s.speechModels.forEach((ref, i) => {
+        const li = list.createEl("li");
+        const [pid, ...rest] = ref.split("|");
+        const p = this.s.providers.find((x) => x.id === pid);
+        li.createSpan({ text: `${p?.name ?? "(missing provider)"} · ${rest.join("|")}` });
+        li.createEl("button", { cls: "psh-link", text: "Remove" }).onclick = async () => {
+          this.s.speechModels.splice(i, 1);
+          await this.save();
+          this.redraw();
+        };
+      });
+    }
+    const speakers = this.s.providers.filter((p) => p.type !== "anthropic");
+    let pid = speakers[0]?.id ?? "";
+    let model = "";
+    models
+      .addDropdown((d) => {
+        for (const p of speakers) d.addOption(p.id, p.name);
+        d.onChange((v) => (pid = v));
+      })
+      .addText((t) => t.setPlaceholder("Model name").onChange((v) => (model = v.trim())))
+      .addButton((b) =>
+        b.setButtonText("Add").onClick(async () => {
+          if (!pid || !model) return;
+          this.s.speechModels.push(makeRef(pid, model));
+          await this.save();
+          this.redraw();
+        })
+      );
+
+    new Setting(el)
+      .setName("Voice")
+      .setDesc(`Empty uses ${DEFAULT_VOICES.gemini} for Gemini and ${DEFAULT_VOICES.openai} for OpenAI. The name must exist on the provider that reads.`)
+      .addText((t) =>
+        t.setPlaceholder(DEFAULT_VOICES.gemini).setValue(this.s.speechVoice).onChange(async (v) => {
+          this.s.speechVoice = v.trim();
+          await this.save();
+        })
+      );
+
+    new Setting(el)
+      .setName("Speed")
+      .addDropdown((d) => {
+        for (const r of [0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3]) d.addOption(String(r), `${r}×`);
+        d.setValue(String(this.s.speechRate || 1)).onChange((v) => this.plugin.speech.setRate(Number(v)));
+      })
+      .addButton((b) =>
+        b.setButtonText("Test").onClick(() => {
+          try {
+            this.plugin.speech.speak("This is how the voice sounds. You can change it here.", { id: "settings-test", title: "Voice test" });
+          } catch (e) {
+            new Notice(errorText(e), 8000);
+          }
         })
       );
   }
