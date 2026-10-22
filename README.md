@@ -54,7 +54,9 @@ const reply = await ai.chat({ system: "…", prompt: "…" });
 
 `ai.version` is `3`. Everything from version 2 works as before; a request without images or audio sends exactly the same body as it did.
 
-A message can carry images and audio next to its text. `data` is base64 without the `data:` prefix:
+A message can carry images and audio next to its text. `data` is base64 without the `data:` prefix. A photo of a receipt, for example, comes back as items you can put straight into a table:
+
+![A photo of a receipt in a note, read into a table and JSON](./images/vision-json.png)
 
 ```js
 if (ai.version >= 3 && ai.capabilities().images) {
@@ -74,7 +76,12 @@ const transcript = await ai.chat({
 });
 ```
 
+A voice memo can be transcribed and summarized the same way:
+
+![A voice memo in a note, with its transcript and a summary of decisions and to-dos](./images/audio.png)
+
 - **Which models get them.** Each model in settings has an **Images** and an **Audio** toggle. A request with images or audio skips every model in the default and fallback chain that is not marked for them, and fails with *No model that accepts images is set up* when none is left. The toggles start on for names containing `gemini`, `gpt-4o`, `gpt-4.1`, `claude` or `vision` (images) and `gemini`, `audio` or `voxtral` (audio). Anthropic has no audio input.
+  ![Images and Audio toggles for each model in settings](./images/model-inputs.png)
 - **How they are sent.** Images go as `image_url` parts (OpenAI-compatible), `inline_data` (Gemini) or base64 `image` blocks (Anthropic); audio as `input_audio` parts (OpenAI-compatible) or `inline_data` (Gemini).
 - **Size.** Images may add up to 8 MB of base64 per request, audio to 15 MB; larger requests are rejected before anything is sent. Downscale or compress first.
 - **JSON.** `json: true` sets `responseMimeType` on Gemini and `response_format: { type: "json_object" }` on OpenAI-compatible providers (retried once without it if the provider answers 400); Anthropic relies on the prompt. The returned text has any ```` ``` ```` fences stripped, so it can go straight into `JSON.parse`.
