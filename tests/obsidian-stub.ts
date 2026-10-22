@@ -1,6 +1,8 @@
 export interface StubResponse {
   status: number;
   text: string;
+  arrayBuffer?: ArrayBuffer;
+  headers?: Record<string, string>;
 }
 
 export interface StubRequest {
@@ -16,7 +18,11 @@ export const stub = {
   respond: (_req: StubRequest): StubResponse => ({ status: 200, text: "{}" }),
 };
 
-export function requestUrl(req: StubRequest): Promise<StubResponse> {
+export function requestUrl(req: StubRequest): Promise<Required<StubResponse>> {
   stub.requests.push(req);
-  return Promise.resolve(stub.respond(req));
+  const r = stub.respond(req);
+  return Promise.resolve({ arrayBuffer: new ArrayBuffer(0), headers: {}, ...r });
 }
+
+export const moment = () => ({ format: () => "2026-10-23 10-00" });
+export const normalizePath = (p: string) => p;
