@@ -88,7 +88,7 @@ export class PlayerBar {
       else if (cur.finished && cur.state.phase !== "failed") this.speech.speak(cur.text, { id: cur.state.id, title: cur.state.title });
     };
     this.retry = row.createEl("button", { cls: "mod-cta", text: "Retry" });
-    this.retry.onclick = () => this.speech.current?.retry();
+    this.retry.onclick = () => this.speech.retry();
     this.rate = row.createEl("select", { cls: "dropdown" });
     for (const r of RATES) this.rate.createEl("option", { value: String(r), text: `${r}×` });
     this.rate.onchange = () => this.speech.setRate(Number(this.rate.value));

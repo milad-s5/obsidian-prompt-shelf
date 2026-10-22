@@ -1,7 +1,7 @@
 import { moment, normalizePath, TFile } from "obsidian";
 import type PromptShelfPlugin from "../main";
 import { AiError } from "../ai/errors";
-import { AudioPart, joinAudio, playable } from "./audio";
+import { AudioPart, joinAudio, playable, wavHeader } from "./audio";
 import { SynthResult, SynthStatus, Synthesizer } from "./synth";
 import { speechChunks, speechText } from "./text";
 
@@ -148,11 +148,12 @@ export class SpeechSession implements SpeechHandle {
     const ready = playable(part);
     const url = URL.createObjectURL(new Blob([ready.bytes], { type: ready.mime }));
     return new Promise<void>((resolve, reject) => {
-      const a = new Audio(url);
+      const a = this.speech.player();
+      a.src = url;
       a.playbackRate = this.speech.rate;
-      (a as HTMLAudioElement & { preservesPitch: boolean }).preservesPitch = true;
       this.audio = a;
       const end = () => {
+        a.ontimeupdate = a.onended = a.onerror = null;
         URL.revokeObjectURL(url);
         this.audio = null;
         this.stopPlayback = null;
@@ -236,6 +237,28 @@ export class SpeechSession implements SpeechHandle {
 export class SpeechController {
   current: SpeechSession | null = null;
   private listeners = new Set<(s: SpeechState | null) => void>();
+  private element: HTMLAudioElement | null = null;
+
+  /**
+   * Phones only let audio play when it starts from a tap, and the first part is ready
+   * seconds later. So one element is created and started on the tap that calls speak(),
+   * with a moment of silence, and every part then plays through that same element.
+   */
+  player(): HTMLAudioElement {
+    if (!this.element) {
+      this.element = new Audio();
+      (this.element as HTMLAudioElement & { preservesPitch: boolean }).preservesPitch = true;
+    }
+    return this.element;
+  }
+
+  private unlock(): void {
+    const a = this.player();
+    if (a.src && !a.paused) return;
+    const silence = URL.createObjectURL(new Blob([wavHeader(320, 8000), new Uint8Array(320)], { type: "audio/wav" }));
+    a.src = silence;
+    a.play().catch(() => undefined).finally(() => URL.revokeObjectURL(silence));
+  }
 
   constructor(readonly plugin: PromptShelfPlugin, private synth: Synthesizer) {}
 
@@ -254,10 +277,11 @@ export class SpeechController {
   speak(text: string, opts: SpeakOptions = {}): SpeechSession {
     const prev = this.current;
     if (prev && prev.state.phase === "failed" && prev.state.id === (opts.id ?? "") && prev.text === text) {
-      prev.retry();
+      this.retry();
       return prev;
     }
     prev?.stop();
+    this.unlock();
     const session = new SpeechSession(this, this.synth, text, opts);
     if (session.empty) throw new AiError("input", "There is no text to read.");
     this.current = session;
@@ -268,6 +292,12 @@ export class SpeechController {
 
   stop(): void {
     this.current?.stop();
+  }
+
+  retry(): void {
+    if (this.current?.state.phase !== "failed") return;
+    this.unlock();
+    this.current.retry();
   }
 
   dismiss(): void {

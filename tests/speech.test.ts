@@ -46,9 +46,37 @@ const quota = (perDay: boolean) => ({
 });
 const modelOf = (r: StubRequest) => /models\/([^:]+):/.exec(r.url)?.[1] ?? (JSON.parse(r.body ?? "{}") as { model?: string }).model;
 
+/** Like a real element: changing src cancels the clip that was playing, so it never "ends" */
+class FakeAudio {
+  static plays: string[] = [];
+  src = "";
+  paused = true;
+  playbackRate = 1;
+  onended: (() => void) | null = null;
+  ontimeupdate: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  play() {
+    const src = this.src;
+    FakeAudio.plays.push(src);
+    this.paused = false;
+    setTimeout(() => {
+      if (this.src === src) {
+        this.paused = true;
+        this.onended?.();
+      }
+    }, 0);
+    return Promise.resolve();
+  }
+  pause() {
+    this.paused = true;
+  }
+}
+g.Audio = FakeAudio;
+
 beforeEach(() => {
   stub.requests = [];
   stub.respond = () => geminiAudio();
+  FakeAudio.plays = [];
 });
 
 test("speechText drops markdown, links, code, timestamps and frontmatter", () => {
@@ -149,15 +177,6 @@ test("when every model fails, the error lists each one", async () => {
 });
 
 test("a failed part is retried from where it stopped, without remaking earlier parts", async () => {
-  g.Audio = class {
-    playbackRate = 1;
-    onended: (() => void) | null = null;
-    play() {
-      setTimeout(() => this.onended?.(), 0);
-      return Promise.resolve();
-    }
-    pause() {}
-  };
   const text = "First sentence here. ".repeat(40) + "Second part. ".repeat(80);
   let fail = true;
   const made: string[] = [];
@@ -183,4 +202,15 @@ test("a failed part is retried from where it stopped, without remaking earlier p
   assert.equal(speech.state()?.phase, "done");
   assert.equal(made.length, first.state.total);
   assert.ok(states.includes("playing") && states.includes("failed"));
+});
+
+test("playback is started on the tap itself, before any audio is ready, and reused for every part", async () => {
+  const p = plugin([gemini], ["g|only-tts"]);
+  const speech = new SpeechController(p as never, new Synthesizer(p as never));
+  const session = speech.speak("One sentence. ".repeat(60) + "More. ".repeat(200), { id: "tap" });
+  assert.equal(FakeAudio.plays.length, 1, "a silent clip plays synchronously inside speak()");
+  await session.done;
+  assert.equal(session.state.phase, "done");
+  assert.equal(FakeAudio.plays.length, 1 + session.state.total);
+  assert.equal(speech.player(), speech.player());
 });
