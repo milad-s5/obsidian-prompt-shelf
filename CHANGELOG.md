@@ -8,7 +8,9 @@
 - Requests over 8 MB of images or 15 MB of audio are rejected before sending.
 - Image and audio data is never logged, saved or cached; long base64 runs are removed from error details.
 - `api.version` is now `3`, with a new `api.capabilities()`. Every version 2 method behaves as before.
-- Unit tests (`npm test`) for the request bodies, model selection, JSON handling and streaming.
+- **Read aloud**: right-click a selection or a note, or use the command, to hear it read by Gemini or OpenAI speech models. A player bar shows which part is being prepared and for how long, quota waits with a countdown, playback, and errors with a Retry that continues from the failed part. Pause, speed, stop, and **Save audio** to the attachments folder with a link in the note.
+- `api.speech` (`speak`, `stop`, `state`, `onChange`, `rate`, `setRate`, `synthesize`) and `capabilities().speech`.
+- Unit tests (`npm test`) for the request bodies, model selection, JSON handling, streaming and speech.
 
 ## 1.0.0
 

@@ -88,6 +88,18 @@ A voice memo can be transcribed and summarized the same way:
 - **`ai.capabilities()`** returns `{ images, audio, json }`: whether at least one model with a key accepts images, accepts audio, and is set up at all.
 - **Privacy.** Image and audio data, and request or response bodies that carry them, are never logged, saved or cached. Error details have long base64 runs replaced with `[data]`.
 
+## Read aloud
+
+Select some text — or nothing, for the whole note — then right-click and choose **Read selection aloud**, or run *Prompt Shelf: Read the selection or the whole note aloud*.
+
+![Read selection aloud in the editor menu, and the player bar showing its progress](./images/read-aloud.png)
+
+- **Voices come from your providers.** Gemini speech models are used automatically when a Gemini provider has a key, and OpenAI's when an OpenAI provider does. Under **Read aloud** in settings you can list the models yourself, pick a voice and set the speed. Anthropic and OpenRouter have no speech models.
+- **It starts quickly.** The text is split into parts that grow from about 500 to 2,000 characters; each next part is made while the current one plays.
+- **The player bar says where things are:** which part is being prepared and for how long, a countdown while a provider's per-minute quota refills, which part is playing, or what went wrong. A daily quota or an unavailable model moves on to the next speech model by itself. After an error, **Retry** carries on from the part that failed.
+- **Save audio** writes the whole text as one file to your attachments folder (WAV from Gemini, MP3 from OpenAI) and, when you started from the editor, puts a link to it below what was read.
+- From a script: `ai.speech.speak(text, { id, title })`, `ai.speech.stop()`, `ai.speech.state()`, `ai.speech.onChange(cb)`, `ai.speech.setRate(1.5)` and `ai.speech.synthesize(text)` for the audio of a short text without playing it. `ai.capabilities().speech` tells whether a speech model is set up.
+
 ## Saving answers
 
 **Save as note** creates a note in the folder set in settings (`Inbox` by default), named from a template such as `{{title}} - {{action}}`. The action, model, date and the script's variables — a title or a URL, say — become note properties.
