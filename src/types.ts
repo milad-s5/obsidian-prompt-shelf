@@ -2,12 +2,19 @@ export type ProviderType = "openai" | "anthropic" | "gemini";
 
 export type ThinkingLevel = "" | "off" | "low" | "medium" | "high";
 
+export interface ModelFlags {
+  images?: boolean;
+  audio?: boolean;
+}
+
 export interface Provider {
   id: string;
   name: string;
   type: ProviderType;
   baseUrl: string;
   models: string[];
+  /** Per-model input overrides; a model without an entry is judged by its name */
+  modelFlags?: Record<string, ModelFlags>;
 }
 
 export interface Action {

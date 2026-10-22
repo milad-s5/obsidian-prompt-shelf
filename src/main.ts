@@ -20,6 +20,8 @@ export interface PromptShelfApi {
   run(actionId: string, text: string, opts?: RunOptions): Promise<string>;
   runDetailed(actionId: string, text: string, opts?: RunOptions): Promise<RunResult>;
   chat(req: ChatRequest): Promise<ChatResult>;
+  /** What the set-up models can take: images, audio, and whether any model is ready for JSON answers */
+  capabilities(): { images: boolean; audio: boolean; json: boolean };
   actions(): { id: string; name: string }[];
   models(): ModelOption[];
   ready(): boolean;
@@ -44,10 +46,11 @@ export default class PromptShelfPlugin extends Plugin {
     this.client = new AiClient(this);
 
     this.api = {
-      version: 2,
+      version: 3,
       run: async (id, text, opts) => (await this.runById(id, text, opts)).text,
       runDetailed: (id, text, opts) => this.runById(id, text, opts),
       chat: (req) => this.client.chat(req),
+      capabilities: () => this.client.capabilities(),
       actions: () => this.settings.actions.map((a) => ({ id: a.id, name: a.name })),
       models: () => this.client.modelOptions(),
       ready: () => this.client.candidates().length > 0,

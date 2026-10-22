@@ -1,9 +1,59 @@
 import { ProviderType, ThinkingLevel } from "../types";
+import { AiError } from "./errors";
 import { arr, obj, str } from "./json";
+
+export type ImageMime = "image/jpeg" | "image/png" | "image/webp";
+export type AudioMime = "audio/mpeg" | "audio/mp3" | "audio/wav" | "audio/ogg" | "audio/webm" | "audio/mp4" | "audio/aac" | "audio/flac";
+
+/** `data` is base64 without the `data:` prefix */
+export interface Media<M extends string> {
+  mime: M;
+  data: string;
+}
 
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  images?: Media<ImageMime>[];
+  audio?: Media<AudioMime>[];
+}
+
+const AUDIO_FORMATS: Record<string, string> = {
+  "audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/wav": "wav", "audio/x-wav": "wav", "audio/ogg": "ogg",
+  "audio/webm": "webm", "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/aac": "aac", "audio/flac": "flac",
+};
+
+/** A message without media goes out exactly as callers wrote it before media existed */
+function plain(m: ChatMessage): Omit<ChatMessage, "images" | "audio"> | null {
+  const { images, audio, ...rest } = m;
+  return images?.length || audio?.length ? null : rest;
+}
+
+function openaiMessage(m: ChatMessage): unknown {
+  return plain(m) ?? {
+    role: m.role,
+    content: [
+      { type: "text", text: m.content },
+      ...(m.images ?? []).map((i) => ({ type: "image_url", image_url: { url: `data:${i.mime};base64,${i.data}` } })),
+      ...(m.audio ?? []).map((a) => ({ type: "input_audio", input_audio: { data: a.data, format: AUDIO_FORMATS[a.mime] ?? a.mime.replace(/^audio\//, "") } })),
+    ],
+  };
+}
+
+function anthropicMessage(m: ChatMessage): unknown {
+  if (m.audio?.length) throw new AiError("setup", "Anthropic models do not accept audio. Turn off Audio for this model in Prompt Shelf settings, or use a Gemini or OpenAI-compatible audio model.");
+  return plain(m) ?? {
+    role: m.role,
+    content: [
+      ...(m.images ?? []).map((i) => ({ type: "image", source: { type: "base64", media_type: i.mime, data: i.data } })),
+      { type: "text", text: m.content },
+    ],
+  };
+}
+
+function geminiParts(m: ChatMessage): unknown[] {
+  const inline = (x: Media<string>) => ({ inline_data: { mime_type: x.mime, data: x.data } });
+  return [{ text: m.content }, ...(m.images ?? []).map(inline), ...(m.audio ?? []).map(inline)];
 }
 
 export interface ChatParams {
@@ -13,6 +63,7 @@ export interface ChatParams {
   temperature?: number;
   maxTokens?: number;
   thinking?: ThinkingLevel;
+  json?: boolean;
   stream: boolean;
 }
 
@@ -55,7 +106,7 @@ const openai: Adapter = {
   chat(baseUrl, key, p) {
     const body: Record<string, unknown> = {
       model: p.model,
-      messages: p.system ? [{ role: "system", content: p.system }, ...p.messages] : p.messages,
+      messages: [...(p.system ? [{ role: "system", content: p.system }] : []), ...p.messages.map(openaiMessage)],
     };
     // Reasoning models reject temperature and max_tokens, so both are sent only when asked for
     if (p.temperature != null) body.temperature = p.temperature;
@@ -64,6 +115,7 @@ const openai: Adapter = {
       if (/openrouter\.ai/i.test(baseUrl)) body.reasoning = { effort: p.thinking === "off" ? "none" : p.thinking };
       else body.reasoning_effort = p.thinking === "off" ? "minimal" : p.thinking;
     }
+    if (p.json) body.response_format = { type: "json_object" };
     if (p.stream) body.stream = true;
     return { url: `${baseUrl}/chat/completions`, method: "POST", headers: bearer(key), body };
   },
@@ -115,7 +167,7 @@ const anthropic: Adapter = {
     const body: Record<string, unknown> = {
       model: p.model,
       max_tokens: budget ? Math.max(maxTokens, budget + 4096) : maxTokens,
-      messages: p.messages,
+      messages: p.messages.map(anthropicMessage),
     };
     if (p.system) body.system = p.system;
     if (budget) body.thinking = { type: "enabled", budget_tokens: budget };
@@ -175,13 +227,14 @@ const gemini: Adapter = {
   chat(baseUrl, key, p) {
     const model = p.model.replace(/^models\//, "");
     const body: Record<string, unknown> = {
-      contents: p.messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
+      contents: p.messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: geminiParts(m) })),
     };
     if (p.system) body.systemInstruction = { parts: [{ text: p.system }] };
     const config: Record<string, unknown> = {};
     if (p.temperature != null) config.temperature = p.temperature;
     if (p.maxTokens) config.maxOutputTokens = p.maxTokens;
     if (p.thinking) config.thinkingConfig = geminiThinking(model, p.thinking);
+    if (p.json) config.responseMimeType = "application/json";
     if (Object.keys(config).length) body.generationConfig = config;
     const url = p.stream
       ? `${baseUrl}/models/${model}:streamGenerateContent?alt=sse`

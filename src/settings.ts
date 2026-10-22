@@ -3,6 +3,7 @@ import type PromptShelfPlugin from "./main";
 import { AiError } from "./ai/errors";
 import { ModelPicker } from "./ui/pickers";
 import { FolderSuggest } from "./ui/FolderSuggest";
+import { Capability, accepts } from "./ai/capabilities";
 import { Action, DEFAULT_ACTIONS, PRESETS, PROVIDER_TYPES, Provider, ProviderType, THINKING_LEVELS, ThinkingLevel } from "./types";
 
 const uid = (prefix: string) => `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -182,6 +183,8 @@ export class PromptShelfSettingTab extends PluginSettingTab {
         t.inputEl.addEventListener("change", () => this.redraw());
       });
 
+    this.renderModelInputs(box, p);
+
     new Setting(box)
       .addButton((b) =>
         b.setButtonText("Browse models").onClick(async () => {
@@ -227,6 +230,27 @@ export class PromptShelfSettingTab extends PluginSettingTab {
           }
         })
       );
+  }
+
+  /** Which models may receive images or audio; scripts that send them skip the others */
+  private renderModelInputs(box: HTMLElement, p: Provider): void {
+    if (!p.models.length) return;
+    const list = box.createDiv({ cls: "psh-model-inputs" });
+    list.createDiv({ cls: "setting-item-description", text: "Inputs each model accepts besides text. Requests with images or audio only go to models marked for them." });
+    for (const model of p.models) {
+      const row = new Setting(list).setName(model);
+      const toggle = (label: string, cap: Capability) => {
+        row.controlEl.createSpan({ cls: "psh-muted", text: label });
+        row.addToggle((t) =>
+          t.setValue(accepts(p, model, cap)).onChange(async (v) => {
+            p.modelFlags = { ...p.modelFlags, [model]: { ...p.modelFlags?.[model], [cap]: v } };
+            await this.save();
+          })
+        );
+      };
+      toggle("Images", "images");
+      toggle("Audio", "audio");
+    }
   }
 
   private renderKey(box: HTMLElement, p: Provider): void {

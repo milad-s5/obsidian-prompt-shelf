@@ -3,7 +3,8 @@ import type PromptShelfPlugin from "../main";
 import { Provider, ThinkingLevel } from "../types";
 import { ADAPTERS, Adapter, ChatMessage, HttpRequest, ModelInfo, ParsedReply } from "./adapters";
 import { AiError, combineFailures, httpError, toAiError } from "./errors";
-import { obj, parseJson, str } from "./json";
+import { obj, parseJson, str, stripFences } from "./json";
+import { Needs, checkMediaSize, fits, needsOf, noModelFor } from "./capabilities";
 
 export interface ChatRequest {
   prompt?: string;
@@ -13,6 +14,8 @@ export interface ChatRequest {
   temperature?: number;
   maxTokens?: number;
   thinking?: ThinkingLevel;
+  /** Ask for a JSON answer; the returned text has any ``` fences stripped */
+  json?: boolean;
   signal?: AbortSignal;
   onProgress?: (status: string) => void;
   /** Receives the answer so far while it streams */
@@ -70,19 +73,41 @@ export class AiClient {
     return provider ? { provider, model: r.model } : null;
   }
 
-  /** The requested model, then the default, then the fallbacks, without repeats */
-  candidates(ref?: string): Target[] {
+  usable(p: Provider): boolean {
+    return this.plugin.keys.has(p.id) || isLocal(p.baseUrl);
+  }
+
+  /**
+   * The requested model, then the default, then the fallbacks, without repeats and
+   * without models that cannot take the request's images or audio
+   */
+  candidates(ref?: string, needs: Needs = {}): Target[] {
     const s = this.plugin.settings;
     const refs = [ref, s.defaultModel, ...s.fallbackModels].filter((r): r is string => Boolean(r));
     const targets = [...new Set(refs)].map((r) => this.resolve(r)).filter((t): t is Target => t !== null);
-    if (targets.length) return targets;
-    const p = s.providers.find((p) => p.models.length && (this.plugin.keys.has(p.id) || isLocal(p.baseUrl)));
-    return p ? [{ provider: p, model: p.models[0] }] : [];
+    if (targets.length) return targets.filter((t) => fits(t.provider, t.model, needs));
+    for (const p of s.providers) {
+      if (!this.usable(p)) continue;
+      const model = p.models.find((m) => fits(p, m, needs));
+      if (model) return [{ provider: p, model }];
+    }
+    return [];
+  }
+
+  /** What at least one usable model can take */
+  capabilities(): { images: boolean; audio: boolean; json: boolean } {
+    const usable = this.plugin.settings.providers.filter((p) => this.usable(p));
+    const any = (needs: Needs) => usable.some((p) => p.models.some((m) => fits(p, m, needs)));
+    return { images: any({ images: true }), audio: any({ audio: true }), json: any({}) };
   }
 
   async chat(req: ChatRequest): Promise<ChatResult> {
-    const targets = this.candidates(req.model);
+    checkMediaSize(req.messages);
+    const needs = needsOf(req.messages);
+    const media = Boolean(needs.images || needs.audio);
+    const targets = this.candidates(req.model, needs);
     if (!targets.length) {
+      if (media) throw noModelFor(needs);
       throw new AiError("setup", "No model is set up yet. Add a provider, its API key and a model in Prompt Shelf settings.");
     }
     const failures: { label: string; error: AiError }[] = [];
@@ -96,7 +121,9 @@ export class AiClient {
       } catch (e) {
         const error = toAiError(e, this.label(t));
         if (error.kind === "aborted") throw error;
-        console.warn("[prompt-shelf]", this.label(t), error.message, error.detail);
+        // Never log details for requests carrying media: some providers echo the input back
+        if (media) console.warn("[prompt-shelf]", this.label(t), error.message);
+        else console.warn("[prompt-shelf]", this.label(t), error.message, error.detail);
         failures.push({ label: this.label(t), error });
         req.onDelta?.("");
       }
@@ -113,21 +140,31 @@ export class AiClient {
       throw new AiError("setup", `No API key saved for ${t.provider.name}. Add it in Prompt Shelf settings.`);
     }
     const adapter = ADAPTERS[t.provider.type] ?? ADAPTERS.openai;
-    const build = (stream: boolean) => adapter.chat(baseUrl, key, {
+    const build = (stream: boolean, json: boolean) => adapter.chat(baseUrl, key, {
       system: req.system ?? "",
       messages: req.messages ?? [{ role: "user", content: req.prompt ?? "" }],
       model: t.model,
       temperature: req.temperature,
       maxTokens: req.maxTokens ?? (t.provider.type === "anthropic" ? this.plugin.settings.maxTokens : undefined),
       thinking: req.thinking,
+      json,
       stream,
     });
+    const attempt = async (json: boolean): Promise<ParsedReply> => {
+      let reply: ParsedReply | null = null;
+      if (req.onDelta && this.plugin.settings.streaming) reply = await this.stream(build(true, json), adapter, label, req);
+      return reply ?? adapter.parse(await this.send(build(false, json), label, req.signal));
+    };
 
-    let reply: ParsedReply | null = null;
-    if (req.onDelta && this.plugin.settings.streaming) {
-      reply = await this.stream(build(true), adapter, label, req);
+    let reply: ParsedReply;
+    try {
+      reply = await attempt(Boolean(req.json));
+    } catch (e) {
+      // Not every OpenAI-compatible server knows response_format; the prompt still asks for JSON
+      if (!(req.json && t.provider.type === "openai" && e instanceof AiError && e.status === 400)) throw e;
+      req.onDelta?.("");
+      reply = await attempt(false);
     }
-    if (!reply) reply = adapter.parse(await this.send(build(false), label, req.signal));
 
     if (reply.blocked) throw new AiError("blocked", `${label} refused to answer (${reply.blocked}).`);
     if (!reply.text.trim()) {
@@ -135,7 +172,7 @@ export class AiClient {
         ? `${label} used its whole output limit before writing an answer. Raise "Max output tokens" or use another model.`
         : `${label} returned an empty answer.`);
     }
-    return { text: reply.text, model: label, truncated: reply.truncated };
+    return { text: req.json ? stripFences(reply.text) : reply.text, model: label, truncated: reply.truncated };
   }
 
   async listModels(p: Provider): Promise<ModelInfo[]> {

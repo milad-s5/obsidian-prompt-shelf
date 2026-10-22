@@ -126,3 +126,14 @@ details.psh-box > summary {
 .psh-streaming {
   opacity: 0.92;
 }
+.psh-model-inputs {
+  padding-bottom: var(--size-4-2);
+}
+.psh-model-inputs .setting-item {
+  padding: var(--size-4-1) 0;
+  border-top: none;
+}
+.psh-model-inputs .setting-item-name {
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-small);
+}

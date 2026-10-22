@@ -20,6 +20,7 @@ export type AiErrorKind =
 
 export class AiError extends Error {
   attempts: string[] = [];
+  status = 0;
 
   constructor(public kind: AiErrorKind, message: string, public detail = "") {
     super(message);
@@ -66,9 +67,14 @@ function describeRaw(raw: string): string {
 }
 
 export function httpError(status: number, json: unknown, raw: string, label: string): AiError {
-  const detail = (extractMessage(json) || describeRaw(raw)).slice(0, 600);
+  // A provider may echo part of the request; long base64 runs are media and never shown or logged
+  const detail = (extractMessage(json) || describeRaw(raw)).replace(/[A-Za-z0-9+/]{120,}={0,2}/g, "[data]").slice(0, 600);
   const d = detail.toLowerCase();
-  const err = (kind: AiErrorKind, message: string) => new AiError(kind, message, `HTTP ${status}${detail ? `: ${detail}` : ""}`);
+  const err = (kind: AiErrorKind, message: string) => {
+    const e = new AiError(kind, message, `HTTP ${status}${detail ? `: ${detail}` : ""}`);
+    e.status = status;
+    return e;
+  };
 
   if (/location is not supported|unsupported_country|unsupported country|not available in your (country|region)/.test(d))
     return err("region", `${label} is not available from your location. Connect through a VPN, or use another provider.`);
