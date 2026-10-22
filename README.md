@@ -98,6 +98,7 @@ Select some text — or nothing, for the whole note — then right-click and cho
 - **It starts quickly.** The text is split into parts that grow from about 500 to 2,000 characters; each next part is made while the current one plays.
 - **The player bar says where things are:** which part is being prepared and for how long, a countdown while a provider's per-minute quota refills, which part is playing, or what went wrong. A daily quota or an unavailable model moves on to the next speech model by itself. After an error, **Retry** carries on from the part that failed.
 - **Save audio** writes the whole text as one file to your attachments folder (WAV from Gemini, MP3 from OpenAI) and, when you started from the editor, puts a link to it below what was read.
+- **On a phone** it works the same way. Keep Obsidian open while it reads: phones pause apps in the background, and the reading stops with them. API keys live on each device, so enter them on the phone too.
 - From a script: `ai.speech.speak(text, { id, title })`, `ai.speech.stop()`, `ai.speech.state()`, `ai.speech.onChange(cb)`, `ai.speech.setRate(1.5)` and `ai.speech.synthesize(text)` for the audio of a short text without playing it. `ai.capabilities().speech` tells whether a speech model is set up.
 
 ## Saving answers
