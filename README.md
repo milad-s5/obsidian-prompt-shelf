@@ -50,6 +50,37 @@ const reply = await ai.chat({ system: "…", prompt: "…" });
 
 `ai.saveNote(text, { action, vars })`, `ai.actions()`, `ai.models()`, `ai.ready()`, `ai.pick(text)` and `ai.openSettings()` are also available.
 
+### Images, audio and JSON (API version 3)
+
+`ai.version` is `3`. Everything from version 2 works as before; a request without images or audio sends exactly the same body as it did.
+
+A message can carry images and audio next to its text. `data` is base64 without the `data:` prefix:
+
+```js
+if (ai.version >= 3 && ai.capabilities().images) {
+  const reply = await ai.chat({
+    messages: [{
+      role: "user",
+      content: "List the items on this receipt as JSON: [{ name, price }]",
+      images: [{ mime: "image/jpeg", data: base64Jpeg }],   // image/jpeg, image/png or image/webp
+    }],
+    json: true,
+  });
+  const items = JSON.parse(reply.text);
+}
+
+const transcript = await ai.chat({
+  messages: [{ role: "user", content: "Transcribe this.", audio: [{ mime: "audio/mpeg", data: base64Mp3 }] }],
+});
+```
+
+- **Which models get them.** Each model in settings has an **Images** and an **Audio** toggle. A request with images or audio skips every model in the default and fallback chain that is not marked for them, and fails with *No model that accepts images is set up* when none is left. The toggles start on for names containing `gemini`, `gpt-4o`, `gpt-4.1`, `claude` or `vision` (images) and `gemini`, `audio` or `voxtral` (audio). Anthropic has no audio input.
+- **How they are sent.** Images go as `image_url` parts (OpenAI-compatible), `inline_data` (Gemini) or base64 `image` blocks (Anthropic); audio as `input_audio` parts (OpenAI-compatible) or `inline_data` (Gemini).
+- **Size.** Images may add up to 8 MB of base64 per request, audio to 15 MB; larger requests are rejected before anything is sent. Downscale or compress first.
+- **JSON.** `json: true` sets `responseMimeType` on Gemini and `response_format: { type: "json_object" }` on OpenAI-compatible providers (retried once without it if the provider answers 400); Anthropic relies on the prompt. The returned text has any ```` ``` ```` fences stripped, so it can go straight into `JSON.parse`.
+- **`ai.capabilities()`** returns `{ images, audio, json }`: whether at least one model with a key accepts images, accepts audio, and is set up at all.
+- **Privacy.** Image and audio data, and request or response bodies that carry them, are never logged, saved or cached. Error details have long base64 runs replaced with `[data]`.
+
 ## Saving answers
 
 **Save as note** creates a note in the folder set in settings (`Inbox` by default), named from a template such as `{{title}} - {{action}}`. The action, model, date and the script's variables — a title or a URL, say — become note properties.
